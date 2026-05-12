@@ -12,7 +12,9 @@ dependencies = [
 
 [project.scripts]
 register-lab-group = "lab_group_client.register_group:main"
+prepare-lab-session = "lab_group_client.prepare_session:main"
 discover-lab-members = "lab_group_client.discover_members:main"
+run-lab-rounds = "lab_group_client.run_rounds:main"
 lab-key = "lab_group_client.keys:main"
 
 [tool.setuptools.packages.find]

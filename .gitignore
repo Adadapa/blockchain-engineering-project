@@ -211,6 +211,7 @@ tempCodeRunnerFile.py
 
 # Lab private keys
 keys/
+.lab_session.json
 
 # Marimo
 marimo/_static/

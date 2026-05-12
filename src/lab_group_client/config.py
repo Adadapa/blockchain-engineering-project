@@ -23,6 +23,8 @@ DEFAULT_RANDOM_WALK_TIMEOUT_SECONDS = 3.0
 class LabClientConfig:
     private_key_file: Path
     member_public_keys: tuple[bytes, bytes, bytes]
+    session_cache_file: Path = Path(".lab_session.json")
+    group_id: str = ""
     listen_host: str = "0.0.0.0"
     listen_port: int = 8091
     community_id: bytes = bytes.fromhex(DEFAULT_COMMUNITY_ID_HEX)
@@ -32,6 +34,12 @@ class LabClientConfig:
     random_walk_target_peers: int = DEFAULT_RANDOM_WALK_TARGET_PEERS
     random_walk_timeout: float = DEFAULT_RANDOM_WALK_TIMEOUT_SECONDS
     registration_timeout: float = 5.0
+    challenge_timeout: float = 5.0
+    bundle_result_timeout: float = 5.0
+    nonce_to_sign_timeout: float = 5.0
+    signature_share_timeout: float = 5.0
+    next_challenge_retry_delay: float = 0.05
+    nonce_resend_interval: float = 0.25
 
     @classmethod
     def from_file(cls, path: str | Path) -> LabClientConfig:
@@ -56,9 +64,15 @@ class LabClientConfig:
         if not private_key_file.is_file():
             raise ValueError(f"private_key_file does not exist: {private_key_file}")
 
+        session_cache_file = Path(raw.get("session_cache_file", ".lab_session.json"))
+        if not session_cache_file.is_absolute():
+            session_cache_file = config_path.parent / session_cache_file
+
         return cls(
             private_key_file=private_key_file,
             member_public_keys=members,  # type: ignore[arg-type]
+            session_cache_file=session_cache_file,
+            group_id=raw.get("group_id", ""),
             listen_host=raw.get("listen_host", "0.0.0.0"),
             listen_port=int(raw.get("listen_port", 8091)),
             community_id=bytes.fromhex(raw.get("community_id", DEFAULT_COMMUNITY_ID_HEX)),
@@ -70,6 +84,12 @@ class LabClientConfig:
             random_walk_target_peers=int(raw.get("random_walk_target_peers", DEFAULT_RANDOM_WALK_TARGET_PEERS)),
             random_walk_timeout=float(raw.get("random_walk_timeout", DEFAULT_RANDOM_WALK_TIMEOUT_SECONDS)),
             registration_timeout=float(raw.get("registration_timeout", 5.0)),
+            challenge_timeout=float(raw.get("challenge_timeout", 5.0)),
+            bundle_result_timeout=float(raw.get("bundle_result_timeout", 5.0)),
+            nonce_to_sign_timeout=float(raw.get("nonce_to_sign_timeout", 5.0)),
+            signature_share_timeout=float(raw.get("signature_share_timeout", 5.0)),
+            next_challenge_retry_delay=float(raw.get("next_challenge_retry_delay", 0.05)),
+            nonce_resend_interval=float(raw.get("nonce_resend_interval", 0.25)),
         )
 
 
