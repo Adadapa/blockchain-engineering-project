@@ -209,6 +209,9 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Lab private keys
+keys/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

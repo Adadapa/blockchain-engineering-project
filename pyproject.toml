@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blockchain-engineering-project"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pyipv8",
+]
+
+[project.scripts]
+register-lab-group = "lab_group_client.register_group:main"
+lab-key = "lab_group_client.keys:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
