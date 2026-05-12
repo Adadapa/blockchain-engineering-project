@@ -79,6 +79,30 @@ The command will:
 - send the group registration payload with the three public keys
 - print the server response: `success`, `group_id`, and `message`
 
+## Group Member Discovery
+
+Your teammates appear as peers in the same Lab 2 IPv8 community. The client can discover all peers in the community and
+filter the known group members by the public keys in `member_public_keys`.
+
+Run teammate discovery with:
+
+```bash
+discover-lab-members --config config/lab_client.local.json
+```
+
+Your local private key must match one of the three configured public keys. If it does not, discovery fails immediately.
+Otherwise, the command expects to find the other two members.
+
+You can also send a signed group-internal test message to discovered members:
+
+```bash
+discover-lab-members --config config/lab_client.local.json --send "hello from member1"
+```
+
+Group-internal messages are sent inside the same Lab 2 community with IPv8 authenticated messaging. The receiver checks
+the sender from the packet signature, ignores messages from public keys outside `member_public_keys`, and prints the
+sender MID and public key for accepted messages.
+
 ## Code Layout
 
 - `src/lab_group_client/config.py`
@@ -88,11 +112,16 @@ The command will:
 - `src/lab_group_client/community.py`
   Defines the IPv8 protocol messages and community logic. `RegisterPayload` is `message_id=1`.
   `RegisterResponsePayload` is `message_id=2`. This file also sends registration to the discovered server peer and
-  accepts only authenticated responses from the configured server public key.
+  accepts only authenticated responses from the configured server public key. `GroupMessagePayload` is used for signed
+  group-internal messages between discovered teammates.
 
 - `src/lab_group_client/register_group.py`
   CLI workflow for registration. It starts IPv8, waits until the server is discovered by public key, calls the community
   registration method, and prints the result.
+
+- `src/lab_group_client/discover_members.py`
+  Separate CLI workflow for teammate discovery. It starts IPv8, filters discovered peers by `member_public_keys`, and
+  can optionally send a group-internal test message to each matched teammate.
 
 - `src/lab_group_client/keys.py`
   Small helper CLI for printing the public key hex from an existing private key file.

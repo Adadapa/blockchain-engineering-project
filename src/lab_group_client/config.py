@@ -93,7 +93,10 @@ def ipv8_configuration(config: LabClientConfig) -> dict[str, Any]:
         ],
         default_bootstrap_defs,
         # Passed through to settings.community_id before the community is constructed.
-        {"community_id": config.community_id},
+        {
+            "community_id": config.community_id,
+            "member_public_keys": config.member_public_keys,
+        },
         [],
     )
     return builder.finalize()
