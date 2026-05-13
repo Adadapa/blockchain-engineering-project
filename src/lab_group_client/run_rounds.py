@@ -15,6 +15,7 @@ from ipv8_service import IPv8
 
 from lab_group_client.community import ChallengeResponse, LabGroupSigningCommunity, RoundResult, SignatureShare
 from lab_group_client.config import LabClientConfig, ipv8_configuration
+from lab_group_client.prepare_session import build_cache, wait_for_ready_topology
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,6 +66,12 @@ def member_peers_from_cache(config: LabClientConfig, cache: dict[str, Any]) -> d
         if entry is not None:
             peers[public_key] = peer_from_cache_entry(public_key, entry)
     return peers
+
+
+def write_session_cache(config: LabClientConfig, cache: dict[str, Any]) -> None:
+    config.session_cache_file.parent.mkdir(parents=True, exist_ok=True)
+    config.session_cache_file.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
+    print(f"Updated session cache at {config.session_cache_file}")
 
 
 def member_number_for_public_key(config: LabClientConfig, public_key: bytes) -> int:
@@ -268,8 +275,8 @@ async def sign_and_return_nonce_message(
     submitter_peer = member_peers.get(expected_submitter)
     if submitter_peer is None:
         raise ValueError(
-            f"session cache does not contain submitter peer for member{payload_round}; "
-            "run prepare-lab-session again"
+            f"discovered topology does not contain submitter peer for member{payload_round}; "
+            "restart run-lab-rounds while all members are online"
         )
     if expected_round is not None and payload_round != expected_round:
         raise ValueError(f"nonce-to-sign is for round {payload_round}, expected {expected_round}")
@@ -331,7 +338,7 @@ async def run_as_submitter(
     missing_peers = expected_teammate_keys - member_peers.keys()
     if missing_peers:
         missing = ", ".join(key.hex() for key in missing_peers)
-        raise ValueError(f"session cache is missing teammate peer(s): {missing}; run prepare-lab-session again")
+        raise ValueError(f"discovered topology is missing teammate peer(s): {missing}")
 
     outcome = await request_expected_challenge(
         community=community,
@@ -404,10 +411,6 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
     if not config.group_id or config.group_id.startswith("replace-with"):
         raise ValueError("config.group_id must be set to the group_id returned by registration")
 
-    cache = load_session_cache(config.session_cache_file)
-    server_peer = server_peer_from_cache(config, cache)
-    member_peers = member_peers_from_cache(config, cache)
-
     ipv8 = IPv8(
         ipv8_configuration(config),
         extra_communities={"LabGroupSigningCommunity": LabGroupSigningCommunity},
@@ -421,6 +424,10 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
         local_public_key = community.my_peer.public_key.key_to_bin()
         local_member_number = member_number_for_public_key(config, local_public_key)
         print(f"Local member number from registration order: {local_member_number}")
+
+        server_peer, member_peers = await wait_for_ready_topology(community, config)
+        write_session_cache(config, build_cache(config, community, server_peer, member_peers))
+        print("Discovery complete; starting challenge rounds.")
 
         known_server_deadline: float | None = None
         for round_number in range(start_round, 4):
