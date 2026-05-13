@@ -89,6 +89,10 @@ def submitter_public_key(config: LabClientConfig, round_number: int) -> bytes:
     return config.member_public_keys[round_number - 1]
 
 
+def ready_message(config: LabClientConfig, start_round: int) -> str:
+    return f"run-rounds-ready:{config.group_id}:{start_round}"
+
+
 def timeout_before_deadline(deadline: float, fallback: float) -> float:
     # Once the server provides a deadline, no wait should exceed the remaining wall-clock budget.
     remaining = deadline - time.time()
@@ -407,6 +411,59 @@ async def run_as_submitter(
     return outcome.deadline
 
 
+async def wait_for_all_members_ready(
+    community: LabGroupSigningCommunity,
+    config: LabClientConfig,
+    member_peers: dict[bytes, Peer],
+    local_public_key: bytes,
+    local_member_number: int,
+    start_round: int,
+) -> None:
+    expected_teammate_keys = {key for key in config.member_public_keys if key != local_public_key}
+    missing_peers = expected_teammate_keys - member_peers.keys()
+    if missing_peers:
+        missing = ", ".join(key.hex() for key in missing_peers)
+        raise ValueError(f"discovered topology is missing teammate peer(s): {missing}")
+
+    message = ready_message(config, start_round)
+    deadline = asyncio.get_running_loop().time() + config.discovery_timeout
+    announced_count = 0
+
+    print("Waiting until every member has finished discovery before requesting any challenge...")
+    while True:
+        ready_teammates = {
+            group_message.sender_public_key
+            for group_message in community.received_group_messages
+            if group_message.message == message and group_message.sender_public_key in expected_teammate_keys
+        }
+        if ready_teammates == expected_teammate_keys:
+            print("All members are ready; starting challenge rounds.")
+            return
+
+        if asyncio.get_running_loop().time() >= deadline:
+            missing_ready = expected_teammate_keys - ready_teammates
+            missing = ", ".join(
+                f"member{member_number_for_public_key(config, key)}" for key in missing_ready
+            )
+            raise TimeoutError(f"timed out waiting for ready signal from: {missing}")
+
+        announced_count += 1
+        for teammate_key in expected_teammate_keys:
+            peer = member_peers[teammate_key]
+            community.send_group_message(peer, message)
+            print(
+                f"Announced member{local_member_number} ready to "
+                f"member{member_number_for_public_key(config, teammate_key)} at {peer.address} "
+                f"(attempt {announced_count})"
+            )
+
+        print(
+            f"Ready barrier: received {len(ready_teammates)}/{len(expected_teammate_keys)} "
+            "teammate ready signal(s)."
+        )
+        await asyncio.sleep(config.discovery_poll_interval)
+
+
 async def run_rounds(config: LabClientConfig, start_round: int) -> int:
     if not config.group_id or config.group_id.startswith("replace-with"):
         raise ValueError("config.group_id must be set to the group_id returned by registration")
@@ -427,7 +484,15 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
 
         server_peer, member_peers = await wait_for_ready_topology(community, config)
         write_session_cache(config, build_cache(config, community, server_peer, member_peers))
-        print("Discovery complete; starting challenge rounds.")
+        print("Discovery complete.")
+        await wait_for_all_members_ready(
+            community=community,
+            config=config,
+            member_peers=member_peers,
+            local_public_key=local_public_key,
+            local_member_number=local_member_number,
+            start_round=start_round,
+        )
 
         known_server_deadline: float | None = None
         for round_number in range(start_round, 4):
