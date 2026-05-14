@@ -15,7 +15,7 @@ from ipv8_service import IPv8
 
 from lab_group_client.community import ChallengeResponse, LabGroupSigningCommunity, RoundResult, SignatureShare
 from lab_group_client.config import LabClientConfig, ipv8_configuration
-from lab_group_client.prepare_session import build_cache, wait_for_ready_topology
+from lab_group_client.prepare_session import build_cache, seed_peers_from_cache, wait_for_ready_topology
 
 
 def parse_args() -> argparse.Namespace:
@@ -309,10 +309,19 @@ async def run_as_signer(
     config: LabClientConfig,
     member_peers: dict[bytes, Peer],
     round_number: int,
+    known_server_deadline: float | None = None,
 ) -> float:
     print(f"Waiting for nonce from member{round_number}...")
     while True:
-        nonce_message = await community.wait_for_nonce_to_sign(timeout=config.nonce_to_sign_timeout)
+        if known_server_deadline is not None:
+            timeout = timeout_before_deadline(known_server_deadline, config.nonce_to_sign_timeout)
+        else:
+            timeout = config.nonce_to_sign_timeout
+        try:
+            nonce_message = await community.wait_for_nonce_to_sign(timeout=timeout)
+        except TimeoutError:
+            print(f"Timed out waiting for nonce from member{round_number}; still waiting...")
+            continue
         # Sign every valid nonce request we receive. This keeps resends and overlapping round traffic moving.
         deadline = await sign_and_return_nonce_message(
             community=community,
@@ -428,6 +437,8 @@ async def wait_for_all_members_ready(
     message = ready_message(config, start_round)
     deadline = asyncio.get_running_loop().time() + config.discovery_timeout
     announced_count = 0
+    all_ready_count = 0
+    stabilization_rounds = 3  # Extra rounds after all ready to ensure bidirectional discovery
 
     print("Waiting until every member has finished discovery before requesting any challenge...")
     while True:
@@ -437,8 +448,12 @@ async def wait_for_all_members_ready(
             if group_message.message == message and group_message.sender_public_key in expected_teammate_keys
         }
         if ready_teammates == expected_teammate_keys:
-            print("All members are ready; starting challenge rounds.")
-            return
+            all_ready_count += 1
+            if all_ready_count >= stabilization_rounds:
+                print("All members are ready and connections stabilized; starting challenge rounds.")
+                return
+        else:
+            all_ready_count = 0
 
         if asyncio.get_running_loop().time() >= deadline:
             missing_ready = expected_teammate_keys - ready_teammates
@@ -459,7 +474,10 @@ async def wait_for_all_members_ready(
 
         print(
             f"Ready barrier: received {len(ready_teammates)}/{len(expected_teammate_keys)} "
-            "teammate ready signal(s)."
+            "teammate ready signal(s)." + (
+                f" (stabilizing connection: {all_ready_count}/{stabilization_rounds})"
+                if ready_teammates == expected_teammate_keys else ""
+            )
         )
         await asyncio.sleep(config.discovery_poll_interval)
 
@@ -482,8 +500,21 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
         local_member_number = member_number_for_public_key(config, local_public_key)
         print(f"Local member number from registration order: {local_member_number}")
 
+        if config.session_cache_file.is_file():
+            try:
+                cache = load_session_cache(config.session_cache_file)
+                seed_peers_from_cache(community, cache)
+                print("Seeded peer discovery from session cache.")
+            except Exception as exc:
+                print(f"Could not seed from session cache (non-fatal): {exc}")
+
         server_peer, member_peers = await wait_for_ready_topology(community, config)
         write_session_cache(config, build_cache(config, community, server_peer, member_peers))
+
+        # Send hello messages to confirm bidirectional connectivity with discovered peers.
+        for peer in member_peers.values():
+            community.send_group_message(peer, "hello")
+
         print("Discovery complete.")
         await wait_for_all_members_ready(
             community=community,
@@ -514,6 +545,7 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
                     config=config,
                     member_peers=member_peers,
                     round_number=round_number,
+                    known_server_deadline=known_server_deadline,
                 )
         return 0
     finally:

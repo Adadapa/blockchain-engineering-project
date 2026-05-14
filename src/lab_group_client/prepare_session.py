@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from ipv8.messaging.interfaces.udp.endpoint import UDPv4Address
 from ipv8.peer import Peer
 from ipv8_service import IPv8
 
@@ -37,6 +38,19 @@ def parse_args() -> argparse.Namespace:
         help="Optional session cache path. Defaults to session_cache_file from config.",
     )
     return parser.parse_args()
+
+
+def seed_peers_from_cache(community: LabGroupSigningCommunity, cache: dict[str, Any]) -> None:
+    # Send introduction requests to every address we know about from the last session.
+    # This opens NAT holes by ensuring our node makes the first outgoing UDP contact,
+    # so peers behind strict NAT (like this host) become reachable for replies.
+    server = cache.get("server", {})
+    if server:
+        host, port = server["address"]
+        community.walk_to(UDPv4Address(host, int(port)))
+    for entry in cache.get("members", {}).values():
+        host, port = entry["address"]
+        community.walk_to(UDPv4Address(host, int(port)))
 
 
 def describe_peer(peer: Peer) -> str:
@@ -98,6 +112,18 @@ async def wait_for_ready_topology(
             else:
                 print(f"Discovered non-group peer: {describe_peer(peer)}")
 
+        # Walk directly to every peer we've already found. This keeps NAT holes open and
+        # makes us visible to peers who learned our address from the bootstrap but couldn't
+        # reach us yet because no outgoing packet from us had opened a mapping their way.
+        if server_peer is not None:
+            community.walk_to(server_peer.address)
+        for peer in member_peers.values():
+            community.walk_to(peer.address)
+
+        # Send hello messages to confirm bidirectional connectivity with member peers.
+        for peer in member_peers.values():
+            community.send_group_message(peer, "hello")
+
         if server_peer is not None and len(member_peers) >= 2:
             return server_peer, member_peers
 
@@ -148,6 +174,14 @@ async def prepare_session(config: LabClientConfig, cache_path_override: str | No
         community = ipv8.get_overlay(LabGroupSigningCommunity)
         if community is None or not isinstance(community, LabGroupSigningCommunity):
             raise RuntimeError("failed to load LabGroupSigningCommunity overlay")
+
+        if cache_path.is_file():
+            try:
+                old_cache = json.loads(cache_path.read_text(encoding="utf-8"))
+                seed_peers_from_cache(community, old_cache)
+                print("Seeded peer discovery from existing session cache.")
+            except Exception as exc:
+                print(f"Could not seed from existing session cache (non-fatal): {exc}")
 
         server_peer, member_peers = await wait_for_ready_topology(community, config)
         cache = build_cache(config, community, server_peer, member_peers)
