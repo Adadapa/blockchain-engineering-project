@@ -1,6 +1,6 @@
 import pytest
 
-from lab_group_client.blockchain.block import hash_block_header, satisfies_pow
+from lab_group_client.blockchain.block_utils import hash_block_header, satisfies_pow
 from lab_group_client.blockchain.miner import mine
 from lab_group_client.blockchain.models import BlockHeader
 

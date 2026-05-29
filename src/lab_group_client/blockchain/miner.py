@@ -1,4 +1,4 @@
-from .block import hash_block_header, satisfies_pow
+from .block_utils import hash_block_header, satisfies_pow
 from .models import BlockHeader
 
 ## search for a nonce that makes the block hash satisfy the difficulty

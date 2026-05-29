@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from lab_group_client.blockchain.block import (
+from lab_group_client.blockchain.block_utils import (
     count_leading_zero_bits,
     hash_block_header,
     hash_transaction,
