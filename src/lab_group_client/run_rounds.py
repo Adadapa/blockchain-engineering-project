@@ -15,7 +15,7 @@ from ipv8_service import IPv8
 
 from lab_group_client.community import ChallengeResponse, LabGroupSigningCommunity, RoundResult, SignatureShare
 from lab_group_client.config import LabClientConfig, ipv8_configuration
-from lab_group_client.prepare_session import build_cache, wait_for_ready_topology
+from lab_group_client.register_group import describe_peer
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,45 +33,6 @@ def parse_args() -> argparse.Namespace:
         help="Round number to start from. The runner continues through round 3.",
     )
     return parser.parse_args()
-
-
-def load_session_cache(path: Path) -> dict[str, Any]:
-    # The prepare trigger writes discovered server/member addresses here before the timed task starts.
-    if not path.is_file():
-        raise ValueError(f"session cache does not exist: {path}; run prepare-lab-session first")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def server_peer_from_cache(config: LabClientConfig, cache: dict[str, Any]) -> Peer:
-    # Rebuild a Peer with the server public key and last discovered UDP address.
-    server = cache["server"]
-    host, port = server["address"]
-    public_key = bytes.fromhex(server["public_key_hex"])
-    if public_key != config.server_public_key:
-        raise ValueError("session cache server public key does not match config.server_public_key")
-    return Peer(public_key, UDPv4Address(host, int(port)))
-
-
-def peer_from_cache_entry(public_key: bytes, entry: dict[str, Any]) -> Peer:
-    host, port = entry["address"]
-    return Peer(public_key, UDPv4Address(host, int(port)))
-
-
-def member_peers_from_cache(config: LabClientConfig, cache: dict[str, Any]) -> dict[bytes, Peer]:
-    # Map each registered public key to the peer address discovered during prepare-lab-session.
-    cached_members = cache.get("members", {})
-    peers: dict[bytes, Peer] = {}
-    for public_key in config.member_public_keys:
-        entry = cached_members.get(public_key.hex())
-        if entry is not None:
-            peers[public_key] = peer_from_cache_entry(public_key, entry)
-    return peers
-
-
-def write_session_cache(config: LabClientConfig, cache: dict[str, Any]) -> None:
-    config.session_cache_file.parent.mkdir(parents=True, exist_ok=True)
-    config.session_cache_file.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
-    print(f"Updated session cache at {config.session_cache_file}")
 
 
 def member_number_for_public_key(config: LabClientConfig, public_key: bytes) -> int:
@@ -309,10 +270,19 @@ async def run_as_signer(
     config: LabClientConfig,
     member_peers: dict[bytes, Peer],
     round_number: int,
+    known_server_deadline: float | None = None,
 ) -> float:
     print(f"Waiting for nonce from member{round_number}...")
     while True:
-        nonce_message = await community.wait_for_nonce_to_sign(timeout=config.nonce_to_sign_timeout)
+        if known_server_deadline is not None:
+            timeout = timeout_before_deadline(known_server_deadline, config.nonce_to_sign_timeout)
+        else:
+            timeout = config.nonce_to_sign_timeout
+        try:
+            nonce_message = await community.wait_for_nonce_to_sign(timeout=timeout)
+        except TimeoutError:
+            print(f"Timed out waiting for nonce from member{round_number}; still waiting...")
+            continue
         # Sign every valid nonce request we receive. This keeps resends and overlapping round traffic moving.
         deadline = await sign_and_return_nonce_message(
             community=community,
@@ -411,6 +381,72 @@ async def run_as_submitter(
     return outcome.deadline
 
 
+async def wait_for_ready_topology(
+    community: LabGroupSigningCommunity,
+    config: LabClientConfig,
+) -> tuple[Peer, dict[bytes, Peer]]:
+    local_public_key = community.my_peer.public_key.key_to_bin()
+    if local_public_key not in config.member_public_keys:
+        raise ValueError(
+            "local private key does not match any configured member_public_keys entry; "
+            f"local public key is {local_public_key.hex()}"
+        )
+
+    print(f"Using identity file: {config.private_key_file}")
+    print(f"Joined community: {config.community_id.hex()}")
+    print(f"Expecting server public key: {config.server_public_key.hex()}")
+    print("Discovering server and group members...")
+
+    deadline = asyncio.get_running_loop().time() + config.discovery_timeout
+    seen_peer_keys: set[bytes] = set()
+    server_peer: Peer | None = None
+    member_peers: dict[bytes, Peer] = {}
+
+    while True:
+        server_peer = community.find_server_peer(config.server_public_key) or server_peer
+        member_peers = community.find_member_peers(config.member_public_keys)
+
+        for peer in community.get_discovered_peers():
+            public_key = peer.public_key.key_to_bin()
+            if public_key in seen_peer_keys:
+                continue
+            seen_peer_keys.add(public_key)
+
+            if public_key == config.server_public_key:
+                print(f"Matched server: {describe_peer(peer)}")
+            elif public_key in config.member_public_keys:
+                print(f"Matched {f"member{config.member_public_keys.index(public_key) + 1}"}: {describe_peer(peer)}")
+            else:
+                print(f"Discovered non-group peer: {describe_peer(peer)}")
+
+        # Walk directly to every peer we've already found. This keeps NAT holes open and
+        # makes us visible to peers who learned our address from the bootstrap but couldn't
+        # reach us yet because no outgoing packet from us had opened a mapping their way.
+        if server_peer is not None:
+            community.walk_to(server_peer.address)
+        for peer in member_peers.values():
+            community.walk_to(peer.address)
+
+        # Send hello messages to confirm bidirectional connectivity with member peers.
+        for peer in member_peers.values():
+            community.send_group_message(peer, "hello")
+
+        if server_peer is not None and len(member_peers) >= 2:
+            return server_peer, member_peers
+
+        if asyncio.get_running_loop().time() >= deadline:
+            raise TimeoutError(
+                "timed out preparing session; "
+                f"server_found={server_peer is not None}, member_peers_found={len(member_peers)}/2"
+            )
+
+        print(
+            "Still preparing: "
+            f"server_found={server_peer is not None}, member_peers_found={len(member_peers)}/2"
+        )
+        await asyncio.sleep(config.discovery_poll_interval)
+
+
 async def wait_for_all_members_ready(
     community: LabGroupSigningCommunity,
     config: LabClientConfig,
@@ -428,6 +464,8 @@ async def wait_for_all_members_ready(
     message = ready_message(config, start_round)
     deadline = asyncio.get_running_loop().time() + config.discovery_timeout
     announced_count = 0
+    all_ready_count = 0
+    stabilization_rounds = 3  # Extra rounds after all ready to ensure bidirectional discovery
 
     print("Waiting until every member has finished discovery before requesting any challenge...")
     while True:
@@ -437,8 +475,12 @@ async def wait_for_all_members_ready(
             if group_message.message == message and group_message.sender_public_key in expected_teammate_keys
         }
         if ready_teammates == expected_teammate_keys:
-            print("All members are ready; starting challenge rounds.")
-            return
+            all_ready_count += 1
+            if all_ready_count >= stabilization_rounds:
+                print("All members are ready and connections stabilized; starting challenge rounds.")
+                return
+        else:
+            all_ready_count = 0
 
         if asyncio.get_running_loop().time() >= deadline:
             missing_ready = expected_teammate_keys - ready_teammates
@@ -459,7 +501,10 @@ async def wait_for_all_members_ready(
 
         print(
             f"Ready barrier: received {len(ready_teammates)}/{len(expected_teammate_keys)} "
-            "teammate ready signal(s)."
+            "teammate ready signal(s)." + (
+                f" (stabilizing connection: {all_ready_count}/{stabilization_rounds})"
+                if ready_teammates == expected_teammate_keys else ""
+            )
         )
         await asyncio.sleep(config.discovery_poll_interval)
 
@@ -483,7 +528,11 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
         print(f"Local member number from registration order: {local_member_number}")
 
         server_peer, member_peers = await wait_for_ready_topology(community, config)
-        write_session_cache(config, build_cache(config, community, server_peer, member_peers))
+
+        # Send hello messages to confirm bidirectional connectivity with discovered peers.
+        for peer in member_peers.values():
+            community.send_group_message(peer, "hello")
+
         print("Discovery complete.")
         await wait_for_all_members_ready(
             community=community,
@@ -514,6 +563,7 @@ async def run_rounds(config: LabClientConfig, start_round: int) -> int:
                     config=config,
                     member_peers=member_peers,
                     round_number=round_number,
+                    known_server_deadline=known_server_deadline,
                 )
         return 0
     finally:

@@ -81,7 +81,19 @@ async def discover_members(config: LabClientConfig, message: str | None, wait_af
                     seen_member_keys.add(public_key)
                     print(f"Matched {member_label(config, public_key)}: {describe_peer(peer)}")
 
+            # Walk directly to every peer we've found. This keeps NAT holes open and
+            # ensures teammates can see us by forcing bidirectional contact.
+            for peer in member_peers.values():
+                community.walk_to(peer.address)
+                community.send_group_message(peer, "hello")
+
             if len(member_peers) >= expected_peer_count:
+                print("All expected peers discovered. Stabilizing connections...")
+                stabilize_until = asyncio.get_running_loop().time() + 15
+                while asyncio.get_running_loop().time() < stabilize_until:
+                    for peer in member_peers.values():
+                        community.walk_to(peer.address)
+                    await asyncio.sleep(1)
                 break
 
             for peer in community.get_discovered_peers():
