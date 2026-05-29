@@ -1,8 +1,8 @@
 import pytest
 
-from lab_group_client.blockchain.block_utils import hash_block_header, satisfies_pow
-from lab_group_client.blockchain.miner import mine
-from lab_group_client.blockchain.models import BlockHeader
+from blockchain.block_utils import hash_block_header, satisfies_pow
+from blockchain.miner import mine
+from blockchain.models import BlockHeader
 
 ZERO_HASH = b"\x00" * 32
 

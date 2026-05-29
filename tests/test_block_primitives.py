@@ -3,14 +3,14 @@ import struct
 
 import pytest
 
-from lab_group_client.blockchain.block_utils import (
+from blockchain.block_utils import (
     count_leading_zero_bits,
     hash_block_header,
     hash_transaction,
     hash_txs,
     satisfies_pow,
 )
-from lab_group_client.blockchain.models import BlockHeader, HEADER_SIZE, Transaction
+from blockchain.models import BlockHeader, HEADER_SIZE, Transaction
 
 ZERO_HASH = b"\x00" * 32
 
