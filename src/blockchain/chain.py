@@ -1,11 +1,15 @@
 from .block_utils import validate_block
 from .models import Block
 from .models.block import InvalidBlockError
+from typing import Dict, List, Optional
 
 class Chain:
     def __init__(self, genesis: Block) -> None:
         self._blocks: list[Block] = [genesis]
         self._hash_to_height: dict[bytes, int] = {genesis.block_hash: 0}
+        self._hash_to_block: Dict[bytes, Block] = {genesis.block_hash: genesis}
+        self._orphans_by_parent: Dict[bytes, List[Block]] = {}
+        self._orphan_set = set()
 
     @property
     def height(self) -> int:
@@ -34,7 +38,45 @@ class Chain:
         height = self.height + 1
         self._blocks.append(block)
         self._hash_to_height[block.block_hash] = height
+        self._hash_to_block[block.block_hash] = block
         return True
+
+    # Returns True if the block is recorded new and False if it was already known
+    def add_block(self, block: Block) -> bool:
+        bh = block.block_hash
+
+        if bh in self._hash_to_block:
+            return False
+
+        validate_block(block)
+
+        parent = block.header.prev_hash
+        if parent in self._hash_to_height:
+            self._hash_to_block[bh] = block
+            parent_height = self._hash_to_height[parent]
+            new_height = parent_height + 1
+            self._hash_to_height[bh] = new_height
+
+            # if this branch overtakes the current tip, assemble fork and switch
+            if new_height > self.height:
+                self.switch_to_fork([block])
+        else:
+            # this is an orphan
+            if bh in self._orphan_set:
+                return False
+            self._orphans_by_parent.setdefault(parent, []).append(block)
+            self._orphan_set.add(bh)
+
+        # Check for orphans of this block
+        children = self._orphans_by_parent.pop(bh, [])
+        for child in children:
+            self._orphan_set.discard(child.block_hash)
+            self.add_block(child)
+
+        return True
+
+    def get_block_by_hash(self, block_hash: bytes) -> Optional[Block]:
+        return self._hash_to_block.get(block_hash)
 
     ## find the height of the common ancestor of current chain,
     ## and check the fork is longer
@@ -60,6 +102,7 @@ class Chain:
             height = len(self._blocks)
             self._blocks.append(block)
             self._hash_to_height[block.block_hash] = height
+            self._hash_to_block[block.block_hash] = block
 
     ## switch the canonical chain to a longer fork
     ## todo: the networking layer must fetch all missing blocks from peers before calling this
@@ -70,6 +113,7 @@ class Chain:
         ancestor_height = self._find_ancestor_height(fork)
         _validate_fork_chain(fork, fork[0].header.prev_hash)
         self._apply_fork(fork, ancestor_height)
+
 
 ## validate each block in the fork
 def _validate_fork_chain(fork: list[Block], ancestor_prev_hash: bytes) -> None:
