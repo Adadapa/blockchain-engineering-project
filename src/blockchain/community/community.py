@@ -16,10 +16,10 @@ class BlockchainCommunity(Community):
     # Must match the community_id you register with the server (20 bytes).
     community_id = b'your-20-byte-id!!'  # replace with your actual ID
 
-    def __init__(self, settings, chain, mempool):
+    def __init__(self, settings):
         super().__init__(settings)
-        self.chain = chain
-        self.mempool = mempool
+        self.chain = None
+        self.mempool = None
 
         # server-facing
         self.add_message_handler(SubmitTransaction, self._on_submit_transaction)
@@ -31,35 +31,35 @@ class BlockchainCommunity(Community):
         self.add_message_handler(RequestBlock, self._on_request_block)
         self.add_message_handler(BlockResponse, self._on_block_response)
 
-        # server communication
+    # server communication
 
-        @lazy_wrapper(SubmitTransaction)
-        def _on_submit_transaction(self, peer, payload):
-            handlers.on_submit_transaction(self, peer, payload)
+    @lazy_wrapper(SubmitTransaction)
+    def _on_submit_transaction(self, peer, payload):
+        handlers.on_submit_transaction(self, peer, payload)
 
-        @lazy_wrapper(GetChainHeight)
-        def _on_get_chain_height(self, peer, payload):
-            handlers.on_get_chain_height(self, peer, payload)
+    @lazy_wrapper(GetChainHeight)
+    def _on_get_chain_height(self, peer, payload):
+        handlers.on_get_chain_height(self, peer, payload)
 
-        @lazy_wrapper(GetBlock)
-        def _on_get_block(self, peer, payload):
-            handlers.on_get_block(self, peer, payload)
+    @lazy_wrapper(GetBlock)
+    def _on_get_block(self, peer, payload):
+        handlers.on_get_block(self, peer, payload)
 
-        # peer sync
+    # peer sync
 
-        @lazy_wrapper(AnnounceBlock)
-        def _on_announce_block(self, peer, payload):
-            sync.on_announce_block(self, peer, payload)
+    @lazy_wrapper(AnnounceBlock)
+    def _on_announce_block(self, peer, payload):
+        sync.on_announce_block(self, peer, payload)
 
-        @lazy_wrapper(RequestBlock)
-        def _on_request_block(self, peer, payload):
-            sync.on_request_block(self, peer, payload)
+    @lazy_wrapper(RequestBlock)
+    def _on_request_block(self, peer, payload):
+        sync.on_request_block(self, peer, payload)
 
-        @lazy_wrapper(BlockResponse)
-        def _on_block_response(self, peer, payload):
-            sync.on_block_response(self, peer, payload)
+    @lazy_wrapper(BlockResponse)
+    def _on_block_response(self, peer, payload):
+        sync.on_block_response(self, peer, payload)
 
-        # called by your miner
+    # called by your miner
 
-        def broadcast_new_block(self, block):
-            sync.broadcast_new_block(self, block)
+    def broadcast_new_block(self, block):
+        sync.broadcast_new_block(self, block)
