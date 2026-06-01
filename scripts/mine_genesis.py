@@ -3,8 +3,8 @@ import sys
 import time
 sys.path.insert(0, "src")
 
-from lab_group_client.blockchain.models import BlockHeader
-from lab_group_client.blockchain.block import hash_block_header, satisfies_pow
+from blockchain.models import BlockHeader
+from blockchain.block_utils import hash_block_header, satisfies_pow
 
 # run this script to mine a new genesis block
 # .venv/bin/python scripts/mine_genesis.py
