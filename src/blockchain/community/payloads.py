@@ -29,6 +29,7 @@ class ChainHeightResponse:
 class GetBlock:
     height: int
 
+
 @payload_dataclass(msg_id=6)
 class BlockResponse:
     height: int
@@ -49,3 +50,7 @@ class AnnounceBlock:
 @payload_dataclass(msg_id=8)
 class RequestBlock:
     height: int
+
+@payload_dataclass(msg_id=9)
+class RequestBlockByHash:
+    block_hash: bytes

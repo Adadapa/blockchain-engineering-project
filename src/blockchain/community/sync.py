@@ -2,7 +2,7 @@
 peer-to-peer block sync logic.
 """
 import hashlib
-from .payloads import AnnounceBlock, RequestBlock, BlockResponse
+from .payloads import AnnounceBlock, RequestBlock, BlockResponse,RequestBlockByHash
 from .handlers import on_get_block
 from ..models import Block, BlockHeader
 
@@ -20,21 +20,53 @@ def broadcast_new_block(community, block):
 # missing blocks before switching forks
 def on_announce_block(community, peer, payload):
     # our block is not behind
-    if payload.height <= community.chain.height:
+    if payload.height < community.chain.height:
         return
 
-    for height in range(community.chain.height + 1, payload.height + 1):
-        community.ez_send(peer, RequestBlock(height=height))
+    if payload.height == community.chain.height and payload.block_hash == community.chain.tip.block_hash:
+        return
+
+    community.ez_send(peer, RequestBlockByHash(block_hash=payload.block_hash))
+    # for height in range(community.chain.height + 1, payload.height + 1):
+    #     community.ez_send(peer, RequestBlock(height=height))
 
 
 def on_request_block(community, peer, payload):
     on_get_block(community, peer, payload)
 
+def on_request_block_by_hash(community, peer, payload):
+    block = community.chain.get_block_by_hash(payload.block_hash)
+    if block is None:
+        return
+    height = getattr(community.chain, "_hash_to_height", {}).get(block.block_hash)
+    if height is None:
+        height = -1
+    tx_hashes = b"".join(block.tx_hashes)
+    community.ez_send(peer, BlockResponse(
+        height=height,
+        prev_hash=block.header.prev_hash,
+        txs_hash=block.header.txs_hash,
+        timestamp=block.header.timestamp,
+        difficulty=block.header.difficulty,
+        nonce=block.header.nonce,
+        block_hash=block.block_hash,
+        tx_hashes=tx_hashes,
+    ))
 
 def on_block_response(community, peer, payload):
-    block = _deserialize_block(payload)
-    if block is not None:
+    try:
+        block = _deserialize_block(payload)
+        if block is None:
+            return
+
         community.chain.add_block(block)
+
+        parent = block.header.prev_hash
+        if community.chain.get_block_by_hash(parent) is None and parent not in getattr(community.chain, "_hash_to_height",
+                                                                                       {}):
+            community.ez_send(peer, RequestBlockByHash(block_hash=parent))
+    except Exception as exc:
+        print(f"Invalid block from {peer}: {exc}")
 
 
 def _deserialize_block(payload: BlockResponse):

@@ -8,6 +8,7 @@ from .payloads import (
     AnnounceBlock,
     RequestBlock,
     BlockResponse,
+    RequestBlockByHash
 )
 from . import handlers, sync
 
@@ -29,6 +30,7 @@ class BlockchainCommunity(Community):
         # peer sync
         self.add_message_handler(AnnounceBlock, self._on_announce_block)
         self.add_message_handler(RequestBlock, self._on_request_block)
+        self.add_message_handler(RequestBlockByHash, self._on_request_block_by_hash)
         self.add_message_handler(BlockResponse, self._on_block_response)
 
     # server communication
@@ -54,6 +56,10 @@ class BlockchainCommunity(Community):
     @lazy_wrapper(RequestBlock)
     def _on_request_block(self, peer, payload):
         sync.on_request_block(self, peer, payload)
+
+    @lazy_wrapper(RequestBlockByHash)
+    def _on_request_block_by_hash(self, peer, payload):
+        sync.on_request_block_by_hash(self, peer, payload)
 
     @lazy_wrapper(BlockResponse)
     def _on_block_response(self, peer, payload):
