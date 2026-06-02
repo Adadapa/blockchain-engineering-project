@@ -19,12 +19,12 @@ PRIVATE_KEY_FILE = "keys/lab1_identity.pem"
 KEY_TYPE = "curve25519"
 LISTEN_PORT = 8091
 
-GROUP_ID = "your-lab-2-group-id"
+GROUP_ID = "4d41fc487bee4c37"
 
 MEMBER_PUBLIC_KEYS = {
-    bytes.fromhex("member-1-public-key-hex"),
-    bytes.fromhex("member-2-public-key-hex"),
-    bytes.fromhex("member-3-public-key-hex"),
+    bytes.fromhex("4c69624e61434c504b3acfc56f266886acbb92502cb690df85dfb0845a6d5b3913a549294e501e4eed769df555fe6aac0266d2680800b5f27f2b964929850deb348b1bdd811b895e54f4"),
+    bytes.fromhex("4c69624e61434c504b3a7ab55be4ae73fb87e6b279d85ec3fce5d9946e69db498ccf03cefc02f8644c1417f185082c53f81c38fe581bc2010c7cbb15b36fc4fb75c874c6e60876b25605"),
+    bytes.fromhex("4c69624e61434c504b3a2373edf8904e50afcc3e6e70d8e02d38cf540ffe075260e721b4950ca580970a3637043eea6b336087ab05c270502cfde1125946f952203a48cb3ccf44946ac8"),
 }
 
 REGISTRATION_COMMUNITY_ID = bytes.fromhex("4c616233426c6f636b636861696e323032365057")
@@ -93,3 +93,7 @@ async def main():
 
     finally:
         await ipv8.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
