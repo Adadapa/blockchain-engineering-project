@@ -73,14 +73,4 @@ def on_get_block(community, peer, payload):
     ))
 
 
-# ── helpers ───────────────────────────────────────────────────────────────
-
-def _compute_tx_hash(payload) -> bytes:
-    return hashlib.sha256(
-        payload.sender_key
-        + payload.data
-        + struct.pack(">q", payload.timestamp)
-        + payload.signature
-    ).digest()
-
 
