@@ -19,6 +19,7 @@ from blockchain.mempool import Mempool
 from blockchain.models import Block, BlockHeader
 from blockchain.miner import mine_and_broadcast
 from blockchain.community.community import BlockchainCommunity
+from ipv8.configuration import get_default_configuration
 from ipv8_service import IPv8
 
 
@@ -56,29 +57,24 @@ async def mining_loop(community, interval: float = 1.0, difficulty: int = 8):
 
 
 async def ipv8_config_default():
-    """
-    Minimal IPv8 configuration for a single node.
-    In a real deployment, use your actual config (e.g., from config file).
-    """
-    return {
-        "overlays": [
-            {
-                "class": "BlockchainCommunity",
-                "key": "anonymous id",
-                "walkers": [
-                    {
-                        "strategy": "RandomWalk",
-                        "peers": 2,
-                        "timeout": 3.0,
-                    }
-                ],
-                "bootstrappers": [
-                    # Add bootstrap peers here if you have a discovery service
-                    # e.g., ("192.168.1.1", 8000)
-                ],
-            }
-        ]
-    }
+    config = get_default_configuration()
+    config["overlays"] = [
+        {
+            "class": "BlockchainCommunity",
+            "key": "anonymous id",
+            "walkers": [
+                {
+                    "strategy": "RandomWalk",
+                    "peers": 2,
+                    "init": {"timeout": 3.0},
+                }
+            ],
+            "bootstrappers": [],
+            "initialize": {},
+            "on_start": [],
+        }
+    ]
+    return config
 
 
 async def main():

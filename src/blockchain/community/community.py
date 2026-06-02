@@ -14,8 +14,7 @@ from . import handlers, sync
 
 
 class BlockchainCommunity(Community):
-    # Must match the community_id you register with the server (20 bytes).
-    community_id = b'your-20-byte-id!!'  # replace with your actual ID
+    community_id = b'BlockchainCommunity!' #20 bytes
 
     def __init__(self, settings):
         super().__init__(settings)
