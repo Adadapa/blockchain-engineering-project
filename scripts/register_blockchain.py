@@ -51,6 +51,14 @@ def ipv8_config():
         {},
         [],
     )
+    builder.add_overlay(
+        "BlockchainCommunity",
+        "member",
+        [WalkerDefinition(Strategy.RandomWalk, 20, {"timeout": 3.0})],
+        default_bootstrap_defs,
+        {},
+        [],
+    )
     return builder.finalize()
 
 
