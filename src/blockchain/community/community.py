@@ -16,7 +16,7 @@ from . import handlers, sync
 
 
 class BlockchainCommunity(Community):
-    community_id = b'BlockchainCommunity!' #20 bytes
+    community_id = bytes.fromhex("4c61623247726f75705369676e696e6732303236") #20 bytes
 
     def __init__(self, settings):
         super().__init__(settings)

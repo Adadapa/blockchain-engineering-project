@@ -2,6 +2,7 @@
 import hashlib
 import struct
 from ..models import Transaction
+from ..block_utils import hash_transaction
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.exceptions import InvalidSignature
 
@@ -27,13 +28,14 @@ def on_submit_transaction(community, peer, payload):
         ))
         return
 
-    tx_hash = _compute_tx_hash(payload)
+
     tx = Transaction(
         sender_key=payload.sender_key,
         data=payload.data,
         timestamp=payload.timestamp,
         signature=payload.signature,
     )
+    tx_hash = hash_transaction(tx)
     accepted = community.mempool.add(tx)
 
     community.ez_send(peer, SubmitTransactionResponse(
@@ -80,3 +82,5 @@ def _compute_tx_hash(payload) -> bytes:
         + struct.pack(">q", payload.timestamp)
         + payload.signature
     ).digest()
+
+
