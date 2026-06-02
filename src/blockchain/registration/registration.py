@@ -1,6 +1,7 @@
 from ipv8.community import Community
 from ipv8.lazy_community import lazy_wrapper
 from ipv8.peer import Peer
+import asyncio
 
 from .payloads import RegisterBlockchain, RegisterBlockchainResponse
 
@@ -21,3 +22,12 @@ class RegistrationCommunity(Community):
         self.response = payload
         print(f"success={payload.success}")
         print(f"message={payload.message}")
+
+async def find_server(community, server_public_key):
+    while True:
+        for peer in community.get_peers():
+            if peer.public_key.key_to_bin() == server_public_key:
+                return peer
+
+        print("server not found yet")
+        await asyncio.sleep(1)

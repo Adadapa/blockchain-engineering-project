@@ -1,5 +1,7 @@
 from ipv8.community import Community
 from ipv8.lazy_community import lazy_wrapper
+from .payloads import Ready
+import asyncio
 
 from .payloads import (
     SubmitTransaction,
@@ -20,6 +22,10 @@ class BlockchainCommunity(Community):
         super().__init__(settings)
         self.chain = None
         self.mempool = None
+
+        # initial peer-discovery
+        self.ready_peers = set()
+        self.add_message_handler(Ready, self._on_ready)
 
         # server-facing
         self.add_message_handler(SubmitTransaction, self._on_submit_transaction)
@@ -68,3 +74,49 @@ class BlockchainCommunity(Community):
 
     def broadcast_new_block(self, block):
         sync.broadcast_new_block(self, block)
+
+    # for initial peer discovery
+    @lazy_wrapper(Ready)
+    def _on_ready(self, peer, payload):
+        self.ready_peers.add(peer.public_key.key_to_bin())
+
+    def send_ready(self, peer, group_id):
+        self.ez_send(peer, Ready(group_id))
+
+
+# before registration, called to first make sure every group memebr discovered everyone
+async def wait_until_group_ready(community, group_id, member_public_keys):
+    ready_sent = False
+
+    while True:
+        known_peers = [
+            peer
+            for peer in community.get_peers()
+            if peer.public_key.key_to_bin() in member_public_keys
+        ]
+
+        for peer in known_peers:
+            community.walk_to(peer.address) # establish stronger connection
+
+        if len(known_peers) >= 2 and not ready_sent:
+            print("discovered both teammates; sending ready")
+            for peer in known_peers:
+                community.send_ready(peer, group_id)
+            ready_sent = True
+
+        if ready_sent:
+
+            if  len(community.ready_peers) == 2:
+                print("ready received from both teammates")
+                return known_peers
+
+            for peer in known_peers: # keep sending ready until you get a response from everyone
+                community.send_ready(peer, group_id)
+
+            print(f"ready from {len(community.ready_peers)}/2 teammates")
+        else:
+            print(f"found {len(known_peers)}/2 teammates")
+
+        await asyncio.sleep(1)
+
+

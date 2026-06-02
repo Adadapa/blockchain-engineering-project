@@ -5,9 +5,12 @@ sys.path.insert(0, "src")
 from ipv8.configuration import ConfigBuilder, Strategy, WalkerDefinition, default_bootstrap_defs
 from ipv8_service import IPv8
 
-from blockchain.community.community import BlockchainCommunity
-from blockchain.registration.registration import RegistrationCommunity
-
+from blockchain.community.community import (BlockchainCommunity,
+    wait_until_group_ready)
+from blockchain.registration.registration import (
+    RegistrationCommunity,
+    find_server
+)
 # run this script to register your blockchain community
 # .venv/bin/python scripts/register_blockchain.py
 
@@ -17,6 +20,12 @@ KEY_TYPE = "curve25519"
 LISTEN_PORT = 8091
 
 GROUP_ID = "your-lab-2-group-id"
+
+MEMBER_PUBLIC_KEYS = {
+    bytes.fromhex("member-1-public-key-hex"),
+    bytes.fromhex("member-2-public-key-hex"),
+    bytes.fromhex("member-3-public-key-hex"),
+}
 
 REGISTRATION_COMMUNITY_ID = bytes.fromhex("4c616233426c6f636b636861696e323032365057")
 SERVER_PUBLIC_KEY = bytes.fromhex(
@@ -48,32 +57,39 @@ def ipv8_config():
 async def main():
     ipv8 = IPv8(
         ipv8_config(),
-        extra_communities={"RegistrationCommunity": RegistrationCommunity},
+        extra_communities={
+            "BlockchainCommunity": BlockchainCommunity,
+            "RegistrationCommunity": RegistrationCommunity,
+        },
     )
     await ipv8.start()
 
     try:
-        community = ipv8.get_overlay(RegistrationCommunity)
+        blockchain = ipv8.get_overlay(BlockchainCommunity)
+        registration = ipv8.get_overlay(RegistrationCommunity)
+
+        print("discovering teammates...")
+        # await wait_until_group_ready(
+        #     blockchain,
+        #     GROUP_ID,
+        #     MEMBER_PUBLIC_KEYS,
+        # )
 
         print("discovering Lab 3 server...")
-        while True:
-            for peer in community.get_peers():
-                if peer.public_key.key_to_bin() == SERVER_PUBLIC_KEY:
-                    print(f"server found at {peer.address}")
-                    community.register_blockchain(
-                        peer,
-                        GROUP_ID,
-                        BlockchainCommunity.community_id,
-                    )
+        server = await find_server(
+            registration,
+            SERVER_PUBLIC_KEY,
+        )
 
-                    while community.response is None:
-                        await asyncio.sleep(0.1)
-                    return
+        print(f"server found at {server.address}")
+        # registration.register_blockchain(
+        #     server,
+        #     GROUP_ID,
+        #     BlockchainCommunity.community_id,
+        # )
 
-            await asyncio.sleep(1)
+        while registration.response is None:
+            await asyncio.sleep(0.1)
 
     finally:
         await ipv8.stop()
-
-
-asyncio.run(main())

@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 from ipv8.messaging.payload_dataclass import dataclass as payload_dataclass
 
@@ -54,3 +55,8 @@ class RequestBlock:
 @payload_dataclass(msg_id=9)
 class RequestBlockByHash:
     block_hash: bytes
+
+# peer discovery
+@payload_dataclass(msg_id=10)
+class Ready:
+    group_id: str
