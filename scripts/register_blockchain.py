@@ -69,19 +69,19 @@ async def main():
         registration = ipv8.get_overlay(RegistrationCommunity)
 
         print("discovering teammates...")
-        # await wait_until_group_ready(
-        #     blockchain,
-        #     GROUP_ID,
-        #     MEMBER_PUBLIC_KEYS,
-        # )
-
-        print("discovering Lab 3 server...")
-        server = await find_server(
-            registration,
-            SERVER_PUBLIC_KEY,
+        await wait_until_group_ready(
+            blockchain,
+            GROUP_ID,
+            MEMBER_PUBLIC_KEYS,
         )
 
-        print(f"server found at {server.address}")
+        print("discovering Lab 3 server...")
+        # server = await find_server(
+        #     registration,
+        #     SERVER_PUBLIC_KEY,
+        # )
+
+        # print(f"server found at {server.address}")
         # registration.register_blockchain(
         #     server,
         #     GROUP_ID,
