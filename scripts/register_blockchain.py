@@ -46,7 +46,7 @@ def ipv8_config():
     builder.add_overlay(
         "RegistrationCommunity",
         "member",
-        [WalkerDefinition(Strategy.RandomWalk, 20, {"timeout": 3.0})],
+        [WalkerDefinition(Strategy.EdgeWalk, 20, {})],
         default_bootstrap_defs,
         {},
         [],
@@ -54,7 +54,7 @@ def ipv8_config():
     builder.add_overlay(
         "BlockchainCommunity",
         "member",
-        [WalkerDefinition(Strategy.RandomWalk, 20, {"timeout": 3.0})],
+        [WalkerDefinition(Strategy.EdgeWalk, 20, {})],
         default_bootstrap_defs,
         {},
         [],
