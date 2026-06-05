@@ -79,8 +79,8 @@ async def ipv8_config_default():
 
 async def main():
     # Initialize chain and mempool
-    chain = Chain(GENESIS_BLOCK)
     mempool = Mempool()
+    chain = Chain(GENESIS_BLOCK, mempool)
     print(f"[Node] Chain initialized (height={chain.height})")
     print(f"[Node] Mempool initialized")
 

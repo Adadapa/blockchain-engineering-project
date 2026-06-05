@@ -1,21 +1,28 @@
 from .block_utils import validate_block
 from .models import Block
 from .models.block import InvalidBlockError
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from .mempool import Mempool
+
 
 class Chain:
-    def __init__(self, genesis: Block) -> None:
+    def __init__(self, genesis: Block, mempool: Optional["Mempool"] = None) -> None:
         self._blocks: list[Block] = [genesis]
         self._hash_to_height: dict[bytes, int] = {genesis.block_hash: 0}
         self._hash_to_block: Dict[bytes, Block] = {genesis.block_hash: genesis}
         self._orphans_by_parent: Dict[bytes, List[Block]] = {}
         self._orphan_set = set()
+        self._mempool = mempool
+        # Saves tx objects removed from the mempool so they can be restored if their
+        # block is later orphaned during a fork switch.
+        self._orphanable_txs: dict[bytes, object] = {}
 
     @property
     def height(self) -> int:
         return len(self._blocks) - 1
 
-    ## current head of the chain of blocks
     @property
     def tip(self) -> Block:
         return self._blocks[-1]
@@ -28,7 +35,6 @@ class Chain:
     def contains(self, block_hash: bytes) -> bool:
         return block_hash in self._hash_to_height
 
-    ## validate and append a block if it extends the current tip
     def try_append(self, block: Block) -> bool:
         if block.header.prev_hash != self.tip.block_hash:
             return False
@@ -39,14 +45,9 @@ class Chain:
         self._blocks.append(block)
         self._hash_to_height[block.block_hash] = height
         self._hash_to_block[block.block_hash] = block
-        # TODO: remove block.tx_hashes from the mempool here after this block is
-        # added to self._blocks, because these transactions are now in a block
-        # we are keeping and should not be mined again.
-        # TODO: if we later stop using this block, its transactions may need to
-        # be put back into the mempool.
+        self._confirm_block_txs(block)
         return True
 
-    # Returns True if the block is recorded new and False if it was already known
     def add_block(self, block: Block) -> bool:
         bh = block.block_hash
 
@@ -62,21 +63,15 @@ class Chain:
             new_height = parent_height + 1
             self._hash_to_height[bh] = new_height
 
-            # if this branch overtakes the current tip, assemble fork and switch
             if new_height > self.height:
-                self.switch_to_fork([block])
-                # TODO: after switch_to_fork starts using this block, remove this
-                # block's tx_hashes from the mempool so they are not mined again.
-                # TODO: later, when support is added for switching away from old
-                # blocks, their transactions may need to go back into the mempool.
+                fork = self._build_fork_chain(block)
+                self.switch_to_fork(fork)
         else:
-            # this is an orphan
             if bh in self._orphan_set:
                 return False
             self._orphans_by_parent.setdefault(parent, []).append(block)
             self._orphan_set.add(bh)
 
-        # Check for orphans of this block
         children = self._orphans_by_parent.pop(bh, [])
         for child in children:
             self._orphan_set.discard(child.block_hash)
@@ -87,8 +82,6 @@ class Chain:
     def get_block_by_hash(self, block_hash: bytes) -> Optional[Block]:
         return self._hash_to_block.get(block_hash)
 
-    ## find the height of the common ancestor of current chain,
-    ## and check the fork is longer
     def _find_ancestor_height(self, fork: list[Block]) -> int:
         fork_base_prev_hash = fork[0].header.prev_hash
         if fork_base_prev_hash not in self._hash_to_height:
@@ -102,25 +95,23 @@ class Chain:
 
         return ancestor_height
 
-    ## truncate the chain to the common ancestor and append the fork blocks
     def _apply_fork(self, fork: list[Block], ancestor_height: int) -> None:
+        orphaned_blocks = self._blocks[ancestor_height + 1:]
+
         self._blocks = self._blocks[:ancestor_height + 1]
         self._hash_to_height = {b.block_hash: h for h, b in enumerate(self._blocks)}
-        # TODO: for each block added below, remove its tx_hashes from the mempool
-        # after it is appended to self._blocks so those transactions are not
-        # mined again.
-        # TODO: the blocks removed by the truncation above are not handled yet;
-        # if we stop using them, their transactions may need to go back into
-        # the mempool.
+
+        # Return orphaned blocks' transactions to the mempool.
+        for block in orphaned_blocks:
+            self._restore_block_txs(block)
 
         for block in fork:
             height = len(self._blocks)
             self._blocks.append(block)
             self._hash_to_height[block.block_hash] = height
             self._hash_to_block[block.block_hash] = block
+            self._confirm_block_txs(block)
 
-    ## switch the canonical chain to a longer fork
-    ## todo: the networking layer must fetch all missing blocks from peers before calling this
     def switch_to_fork(self, fork: list[Block]) -> None:
         if not fork:
             raise ValueError("fork is empty")
@@ -129,8 +120,39 @@ class Chain:
         _validate_fork_chain(fork, fork[0].header.prev_hash)
         self._apply_fork(fork, ancestor_height)
 
+    def _build_fork_chain(self, tip: Block) -> list[Block]:
+        """Walk _hash_to_block back from tip until reaching the canonical chain."""
+        canonical = {b.block_hash for b in self._blocks}
+        chain: list[Block] = []
+        cur = tip
+        while cur.block_hash not in canonical:
+            chain.append(cur)
+            parent = self._hash_to_block.get(cur.header.prev_hash)
+            if parent is None:
+                raise ValueError("cannot build fork chain: missing ancestor block")
+            cur = parent
+        chain.reverse()
+        return chain
 
-## validate each block in the fork
+    def _confirm_block_txs(self, block: Block) -> None:
+        """Remove block's txs from mempool, saving them in case this block is later orphaned."""
+        if self._mempool is None or not block.tx_hashes:
+            return
+        removed = self._mempool.remove_confirmed(block.tx_hashes)
+        for tx in removed:
+            from .block_utils import hash_transaction
+            self._orphanable_txs[hash_transaction(tx)] = tx
+
+    def _restore_block_txs(self, block: Block) -> None:
+        """Re-add a now-orphaned block's transactions back to the mempool."""
+        if self._mempool is None or not block.tx_hashes:
+            return
+        for tx_hash in block.tx_hashes:
+            tx = self._orphanable_txs.pop(tx_hash, None)
+            if tx is not None:
+                self._mempool.add(tx)
+
+
 def _validate_fork_chain(fork: list[Block], ancestor_prev_hash: bytes) -> None:
     prev_hash = ancestor_prev_hash
     for block in fork:

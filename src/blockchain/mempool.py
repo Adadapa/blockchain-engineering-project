@@ -16,6 +16,11 @@ class Mempool:
     def get_pending(self, max_count: int = 100) -> list:
         return list(self._txs.values())[:max_count]
 
-    def remove_confirmed(self, tx_hashes: tuple[bytes, ...]) -> None:
+    def remove_confirmed(self, tx_hashes: tuple[bytes, ...]) -> list:
+        """Remove transactions from the mempool and return the removed objects."""
+        removed = []
         for h in tx_hashes:
-            self._txs.pop(h, None)
+            tx = self._txs.pop(h, None)
+            if tx is not None:
+                removed.append(tx)
+        return removed
