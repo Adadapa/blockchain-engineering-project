@@ -82,6 +82,8 @@ def on_block_response(community, peer, payload):
             return
 
         community.chain.add_block(block)
+        # TODO: do not remove txs from the mempool in this network handler;
+        # that should happen in Chain when this block is added to self._blocks.
 
         parent = block.header.prev_hash
         if community.chain.get_block_by_hash(parent) is None and parent not in getattr(community.chain, "_hash_to_height",

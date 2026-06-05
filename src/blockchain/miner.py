@@ -29,6 +29,7 @@ def mine_and_broadcast(header: BlockHeader, community) -> Block:
     block = Block(header=mined_header, block_hash=block_hash, tx_hashes=tx_hashes)
 
     community.chain.add_block(block)
-    community.mempool.remove_confirmed(tx_hashes)
+    # TODO: do not remove txs from the mempool here; that should happen in
+    # Chain at the moment this block is added to self._blocks.
     community.broadcast_new_block(block)
     return block

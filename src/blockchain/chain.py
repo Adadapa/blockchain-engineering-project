@@ -39,6 +39,11 @@ class Chain:
         self._blocks.append(block)
         self._hash_to_height[block.block_hash] = height
         self._hash_to_block[block.block_hash] = block
+        # TODO: remove block.tx_hashes from the mempool here after this block is
+        # added to self._blocks, because these transactions are now in a block
+        # we are keeping and should not be mined again.
+        # TODO: if we later stop using this block, its transactions may need to
+        # be put back into the mempool.
         return True
 
     # Returns True if the block is recorded new and False if it was already known
@@ -60,6 +65,10 @@ class Chain:
             # if this branch overtakes the current tip, assemble fork and switch
             if new_height > self.height:
                 self.switch_to_fork([block])
+                # TODO: after switch_to_fork starts using this block, remove this
+                # block's tx_hashes from the mempool so they are not mined again.
+                # TODO: later, when support is added for switching away from old
+                # blocks, their transactions may need to go back into the mempool.
         else:
             # this is an orphan
             if bh in self._orphan_set:
@@ -97,6 +106,12 @@ class Chain:
     def _apply_fork(self, fork: list[Block], ancestor_height: int) -> None:
         self._blocks = self._blocks[:ancestor_height + 1]
         self._hash_to_height = {b.block_hash: h for h, b in enumerate(self._blocks)}
+        # TODO: for each block added below, remove its tx_hashes from the mempool
+        # after it is appended to self._blocks so those transactions are not
+        # mined again.
+        # TODO: the blocks removed by the truncation above are not handled yet;
+        # if we stop using them, their transactions may need to go back into
+        # the mempool.
 
         for block in fork:
             height = len(self._blocks)
