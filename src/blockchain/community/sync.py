@@ -9,6 +9,7 @@ def broadcast_new_block(community, block):
         height=community.chain.height,
         block_hash=block.block_hash,
     )
+    print(f"[Block] Broadcast {block.block_hash.hex()[:16]}... h={community.chain.height}")
     for peer in community.get_peers():
         community.ez_send(peer, announcement)
 
@@ -48,6 +49,7 @@ def on_block_response(community, peer, payload):
         block = _deserialize_block(payload)
         if block is None:
             return
+        print(f"[Block] Received {block.block_hash.hex()[:16]}... prev={block.header.prev_hash.hex()[:16]}...")
         community.chain.add_block(block)
         if not community.chain.contains(block.header.prev_hash):
             community.ez_send(peer, RequestBlockByHash(block_hash=block.header.prev_hash))

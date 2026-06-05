@@ -42,8 +42,10 @@ class Chain:
         validate_block(block)
 
         if block.header.prev_hash not in self._hash_to_height:
+            print(f"[Chain] Orphan {block.block_hash.hex()[:16]}...")
             self._orphans.add(block)
         else:
+            print(f"[Chain] Add {block.block_hash.hex()[:16]}...")
             self._connect_block(block)
 
         self._reconnect_orphans(block.block_hash)
@@ -121,7 +123,7 @@ class Chain:
         self._blocks.append(block)
         self._hash_to_height[block.block_hash] = len(self._blocks) - 1
         self._hash_to_block[block.block_hash] = block
-        
+
         self._mempool_sync.on_block_added(block)
 
 # verify that each block's prev_hash connects to the next
