@@ -4,10 +4,11 @@ from ipv8.peer import Peer
 import asyncio
 
 from .payloads import RegisterBlockchain, RegisterBlockchainResponse
+from blockchain.config import (REGISTRATION_COMMUNITY_ID)
 
 
 class RegistrationCommunity(Community):
-    community_id = b"<registration-id-20b>"
+    community_id = REGISTRATION_COMMUNITY_ID
 
     def __init__(self, settings):
         super().__init__(settings)
