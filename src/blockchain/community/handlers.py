@@ -14,20 +14,14 @@ from .payloads import (
 
 # Verify the transaction signature, add to mempool, and respond.
 # Signature covers: sender_key || data || timestamp (8-byte big-endian)
-def on_submit_transaction(community, peer, payload):
-    signed_data = (payload.sender_key + payload.data + struct.pack(">q", payload.timestamp))
+def validate_and_add_transaction(community, payload):
+    signed_data = payload.sender_key + payload.data + struct.pack(">q", payload.timestamp)
 
     try:
         pub_key = Ed25519PublicKey.from_public_bytes(payload.sender_key)
         pub_key.verify(payload.signature, signed_data)
     except (InvalidSignature, ValueError):
-        community.ez_send(peer, SubmitTransactionResponse(
-            success=False,
-            tx_hash=b"\x00" * 32,
-            message="invalid signature",
-        ))
-        return
-
+        return None, b"\x00" * 32, False, "invalid signature"
 
     tx = Transaction(
         sender_key=payload.sender_key,
@@ -38,12 +32,19 @@ def on_submit_transaction(community, peer, payload):
     tx_hash = hash_transaction(tx)
     accepted = community.mempool.add(tx)
 
+    return tx, tx_hash, accepted, "accepted" if accepted else "duplicate"
+
+def on_submit_transaction(community, peer, payload):
+    tx, tx_hash, accepted, message = validate_and_add_transaction(community, payload)
+
     community.ez_send(peer, SubmitTransactionResponse(
         success=accepted,
         tx_hash=tx_hash,
-        message="accepted" if accepted else "duplicate",
+        message=message,
     ))
 
+    if accepted:
+        community.broadcast_transaction(tx, exclude_peer=peer)
 
 def on_get_chain_height(community, peer, payload):
     community.ez_send(peer, ChainHeightResponse(

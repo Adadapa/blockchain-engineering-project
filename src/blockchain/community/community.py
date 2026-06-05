@@ -10,7 +10,8 @@ from .payloads import (
     AnnounceBlock,
     RequestBlock,
     BlockResponse,
-    RequestBlockByHash
+    RequestBlockByHash,
+    AnnounceTransaction
 )
 from . import handlers, sync
 
@@ -37,6 +38,7 @@ class BlockchainCommunity(Community):
         self.add_message_handler(RequestBlock, self._on_request_block)
         self.add_message_handler(RequestBlockByHash, self._on_request_block_by_hash)
         self.add_message_handler(BlockResponse, self._on_block_response)
+        self.add_message_handler(AnnounceTransaction, self._on_announce_transaction)
 
     # server communication
 
@@ -70,10 +72,16 @@ class BlockchainCommunity(Community):
     def _on_block_response(self, peer, payload):
         sync.on_block_response(self, peer, payload)
 
-    # called by your miner
+    @lazy_wrapper(AnnounceTransaction)
+    def _on_announce_transaction(self, peer, payload):
+        sync.on_announce_transaction(self, peer, payload)
 
+    # called by the miner
     def broadcast_new_block(self, block):
         sync.broadcast_new_block(self, block)
+
+    def broadcast_new_transaction(self, transaction, exclude_peer=None): # exclude peer here is for not sending the tx back to who broadcasted it
+        sync.broadcast_new_transaction(self, transaction, exclude_peer=exclude_peer)
 
     # for initial peer discovery
     @lazy_wrapper(Ready)

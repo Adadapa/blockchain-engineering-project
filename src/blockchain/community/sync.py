@@ -2,8 +2,8 @@
 peer-to-peer block sync logic.
 """
 import hashlib
-from .payloads import AnnounceBlock, RequestBlock, BlockResponse,RequestBlockByHash
-from .handlers import on_get_block
+from .payloads import AnnounceBlock, RequestBlock, BlockResponse,RequestBlockByHash, AnnounceTransaction
+from .handlers import on_get_block, validate_and_add_transaction
 from ..models import Block, BlockHeader
 
 
@@ -15,6 +15,20 @@ def broadcast_new_block(community, block):
     for peer in community.get_peers():
         community.ez_send(peer, announcement)
 
+def broadcast_new_transaction(community, tx, exclude_peer=None):
+    payload = AnnounceTransaction(
+        sender_key=tx.sender_key,
+        data=tx.data,
+        timestamp=tx.timestamp,
+        signature=tx.signature,
+    )
+
+    excluded_key = None if exclude_peer is None else exclude_peer.public_key.key_to_bin()
+
+    for peer in community.get_peers():
+        if excluded_key is not None and peer.public_key.key_to_bin() == excluded_key:
+            continue
+        community.ez_send(peer, payload)
 
 # When a new block is mined by peer, if the block is ahead of us we need to request all
 # missing blocks before switching forks
@@ -30,6 +44,14 @@ def on_announce_block(community, peer, payload):
     # for height in range(community.chain.height + 1, payload.height + 1):
     #     community.ez_send(peer, RequestBlock(height=height))
 
+# this is when we received a broadcasted transaction
+def on_announce_transaction(community, peer, payload):
+    tx, tx_hash, accepted, message = validate_and_add_transaction(community, payload)
+
+    if not accepted: # this is triggered if we have seen this transaction before, stop broadcasting
+        return
+
+    community.broadcast_new_transaction(tx, exclude_peer=peer)
 
 def on_request_block(community, peer, payload):
     on_get_block(community, peer, payload)

@@ -56,6 +56,14 @@ class RequestBlock:
 class RequestBlockByHash:
     block_hash: bytes
 
+
+@payload_dataclass(msg_id=11)
+class AnnounceTransaction:
+    sender_key: bytes
+    data: bytes
+    timestamp: int
+    signature: bytes
+
 # peer discovery
 @payload_dataclass(msg_id=10)
 class Ready:

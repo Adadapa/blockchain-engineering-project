@@ -15,7 +15,7 @@ from blockchain.registration.registration import (
 # .venv/bin/python scripts/register_blockchain.py
 
 # --- configure these before running ---
-PRIVATE_KEY_FILE = "keys/mykey.pem"
+PRIVATE_KEY_FILE = "keys/lab1_identity.pem"
 KEY_TYPE = "curve25519"
 LISTEN_PORT = 8091
 
