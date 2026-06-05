@@ -67,7 +67,3 @@ def _send_block_response(community, peer, block, height):
         block_hash=block.block_hash,
         tx_hashes=b"".join(block.tx_hashes),
     ))
-
-
-# re-exported for sync.py
-validate_and_add_transaction = _verify_and_add

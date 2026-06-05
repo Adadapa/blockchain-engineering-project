@@ -78,7 +78,6 @@ class BlockchainCommunity(Community):
         sync.on_announce_transaction(self, peer, payload)
 
 async def wait_until_group_ready(community, group_id, member_public_keys):
-    """Poll until we've received a Ready message from both teammates."""
     while True:
         peers = [
             p for p in community.get_peers()
