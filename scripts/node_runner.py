@@ -13,15 +13,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from blockchain.genesis import GENESIS_BLOCK
-from blockchain.chain import Chain
-from blockchain.mempool import Mempool
-from blockchain.models import Block, BlockHeader
-from blockchain.miner import mine_and_broadcast
+from blockchain.core.genesis import GENESIS_BLOCK
+from blockchain.core.chain import Chain
+from blockchain.core.mempool import Mempool
+from blockchain.core.models import BlockHeader
+from blockchain.core.miner import mine_and_broadcast
 from blockchain.community.community import BlockchainCommunity
 from blockchain.config import (
     PRIVATE_KEY_FILE, KEY_TYPE, NODE_LISTEN_PORT,
-    GROUP_ID, MEMBER_PUBLIC_KEYS, BLOCKCHAIN_COMMUNITY_ID, MINING_DIFFICULTY,
+    BLOCKCHAIN_COMMUNITY_ID, MINING_DIFFICULTY,
 )
 from ipv8.configuration import ConfigBuilder, Strategy, WalkerDefinition, default_bootstrap_defs
 from ipv8_service import IPv8

@@ -3,10 +3,10 @@ Tests for fork handling, consensus (longest-chain rule), and block validation.
 """
 import hashlib
 import pytest
-from blockchain.chain import Chain
-from blockchain.models import Block, BlockHeader
-from blockchain.block_utils import hash_block_header, hash_txs, satisfies_pow
-from blockchain.models.block import InvalidBlockError
+from blockchain.core.chain import Chain
+from blockchain.core.models import Block, BlockHeader
+from blockchain.core.block_utils import hash_block_header, hash_txs, satisfies_pow
+from blockchain.core.models.block import InvalidBlockError
 
 
 @pytest.fixture

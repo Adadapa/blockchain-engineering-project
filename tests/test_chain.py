@@ -1,11 +1,11 @@
 import hashlib
 import pytest
 
-from blockchain.block_utils import hash_block_header, hash_txs
-from blockchain.chain import Chain
-from blockchain.models import InvalidBlockError
-from blockchain.models import Block, BlockHeader
-from blockchain.miner import mine
+from blockchain.core.block_utils import hash_block_header, hash_txs
+from blockchain.core.chain import Chain
+from blockchain.core.models import InvalidBlockError
+from blockchain.core.models import Block, BlockHeader
+from blockchain.core.miner import mine
 
 ZERO_HASH = b"\x00" * 32
 EMPTY_TXS_HASH = hashlib.sha256(b"").digest()
@@ -55,84 +55,13 @@ class TestChainInit:
 
         assert chain.contains(genesis.block_hash)
 
-class TestTryAppend:
-    def test_appends_valid_block(self):
-        genesis = make_genesis()
-        chain = Chain(genesis)
-        block1 = mine_next(genesis)
-
-        assert chain.try_append(block1) is True
-        assert chain.height == 1
-        assert chain.tip == block1
-
-    def test_returns_false_if_does_not_extend_tip(self):
-        genesis = make_genesis()
-        chain = Chain(genesis)
-        block1 = mine_next(genesis)
-        block2 = mine_next(block1)
-
-        # block2 does not extend genesis
-        assert chain.try_append(block2) is False
-        assert chain.height == 0
-
-    def test_multiple_blocks_increase_height(self):
-        genesis = make_genesis()
-        chain = Chain(genesis)
-
-        block1 = mine_next(genesis)
-        block2 = mine_next(block1)
-
-        chain.try_append(block1)
-        chain.try_append(block2)
-
-        assert chain.height == 2
-
-    def test_raises_on_invalid_pow(self):
-        genesis = make_genesis()
-        chain = Chain(genesis)
-
-        # difficulty=255 makes it impossible to satisfy PoW with nonce=0
-        bad_header = BlockHeader(
-            prev_hash=genesis.block_hash,
-            txs_hash=EMPTY_TXS_HASH,
-            timestamp=genesis.header.timestamp + 1,
-            difficulty=255,
-            nonce=0,
-        )
-        bad_block = Block(
-            header=bad_header,
-            block_hash=hash_block_header(bad_header),
-            tx_hashes=(),
-        )
-
-        with pytest.raises(InvalidBlockError):
-            chain.try_append(bad_block)
-
-    def test_raises_on_wrong_txs_hash(self):
-        genesis = make_genesis()
-        chain = Chain(genesis)
-        wrong_txs_hash = b"\xFF" * 32
-
-        header = BlockHeader(
-            prev_hash=genesis.block_hash,
-            txs_hash=wrong_txs_hash,
-            timestamp=genesis.header.timestamp + 1,
-            difficulty=4,
-            nonce=0,
-        )
-        mined_header, block_hash = mine(header)
-        bad_block = Block(header=mined_header, block_hash=block_hash, tx_hashes=())
-
-        with pytest.raises(InvalidBlockError):
-            chain.try_append(bad_block)
-
 
 class TestSwitchToFork:
     def test_switches_to_longer_fork(self):
         genesis = make_genesis()
         chain = Chain(genesis)
         block1 = mine_next(genesis)
-        chain.try_append(block1)
+        chain.add_block(block1)
 
         # fork from genesis
         fork1 = mine_next(genesis)
@@ -148,8 +77,8 @@ class TestSwitchToFork:
         block1 = mine_next(genesis)
         block2 = mine_next(block1)
 
-        chain.try_append(block1)
-        chain.try_append(block2)
+        chain.add_block(block1)
+        chain.add_block(block2)
         fork1 = mine_next(genesis)
 
         with pytest.raises(ValueError):

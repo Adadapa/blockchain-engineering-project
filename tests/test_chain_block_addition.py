@@ -3,9 +3,9 @@ Tests for basic block addition and chain queries.
 """
 import hashlib
 import pytest
-from blockchain.chain import Chain
-from blockchain.models import Block, BlockHeader
-from blockchain.block_utils import hash_block_header, hash_txs, satisfies_pow
+from blockchain.core.chain import Chain
+from blockchain.core.models import Block, BlockHeader
+from blockchain.core.block_utils import hash_block_header, hash_txs, satisfies_pow
 
 
 @pytest.fixture

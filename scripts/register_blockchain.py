@@ -12,15 +12,11 @@ from blockchain.registration.registration import (
     find_server
 )
 from blockchain.config import (
-    PRIVATE_KEY_FILE, KEY_TYPE, GROUP_ID, MEMBER_PUBLIC_KEYS,
-    BLOCKCHAIN_COMMUNITY_ID, REGISTRATION_COMMUNITY_ID, SERVER_PUBLIC_KEY, REGISTRATION_LISTEN_PORT,
+    PRIVATE_KEY_FILE, KEY_TYPE, GROUP_ID, MEMBER_PUBLIC_KEYS, SERVER_PUBLIC_KEY, REGISTRATION_LISTEN_PORT,
 )
 
 # run this script to register your blockchain community
 # .venv/bin/python scripts/register_blockchain.py
-
-RegistrationCommunity.community_id = REGISTRATION_COMMUNITY_ID
-BlockchainCommunity.community_id = BLOCKCHAIN_COMMUNITY_ID
 
 def ipv8_config():
     builder = ConfigBuilder().clear_keys().clear_overlays()

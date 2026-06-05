@@ -1,5 +1,5 @@
 import hashlib
-from blockchain.block_utils import hash_block_header
+from .block_utils import hash_block_header
 from .models import BlockHeader, Block
 
 # todo: replace this with the same ones chosen in mine_genesis.py
