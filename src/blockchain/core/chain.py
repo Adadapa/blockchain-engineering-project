@@ -125,6 +125,11 @@ class Chain:
         self._hash_to_block[block.block_hash] = block
 
         self._mempool_sync.on_block_added(block)
+        print(f"[Chain] h={self.height} {self._chain_view()}")
+
+    def _chain_view(self) -> str:
+        parts = [f"{height}:{block.block_hash.hex()[:8]}" for height, block in enumerate(self._blocks)]
+        return " -> ".join(parts)
 
 # verify that each block's prev_hash connects to the next
 def _check_fork_links(fork: list[Block], base_prev_hash: bytes) -> None:
