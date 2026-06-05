@@ -3,6 +3,7 @@ import pytest
 
 from blockchain.core.block_utils import hash_block_header, hash_txs
 from blockchain.core.chain import Chain
+from blockchain.core.mempool import Mempool
 from blockchain.core.models import InvalidBlockError
 from blockchain.core.models import Block, BlockHeader
 from blockchain.core.miner import mine
@@ -33,25 +34,25 @@ def mine_next(parent: Block, difficulty: int = 4) -> Block:
 class TestChainInit:
     def test_height_is_zero_after_init(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         assert chain.height == 0
 
     def test_tip_is_genesis(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         assert chain.tip == genesis
 
     def test_block_at_zero_is_genesis(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         assert chain.block_at(0) == genesis
 
     def test_contains_genesis_hash(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         assert chain.contains(genesis.block_hash)
 
@@ -59,7 +60,7 @@ class TestChainInit:
 class TestSwitchToFork:
     def test_switches_to_longer_fork(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
         block1 = mine_next(genesis)
         chain.add_block(block1)
 
@@ -73,7 +74,7 @@ class TestSwitchToFork:
 
     def test_raises_if_fork_not_longer(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
         block1 = mine_next(genesis)
         block2 = mine_next(block1)
 
@@ -86,14 +87,14 @@ class TestSwitchToFork:
 
     def test_raises_on_empty_fork(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         with pytest.raises(ValueError):
             chain.switch_to_fork([])
 
     def test_raises_if_fork_does_not_connect(self):
         genesis = make_genesis()
-        chain = Chain(genesis)
+        chain = Chain(genesis, Mempool())
 
         orphan_header = BlockHeader(
             prev_hash=b"\xFF" * 32,

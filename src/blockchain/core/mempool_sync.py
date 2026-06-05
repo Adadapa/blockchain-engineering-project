@@ -1,28 +1,29 @@
 from .block_utils import hash_transaction
 from .models import Block
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .mempool import Mempool
 
-
+# synchronizer for the mempool,
+# as blocks enter or leave the canonical chain
 class MempoolSync:
-    """Keeps the mempool in sync as blocks enter or leave the canonical chain."""
-
-    def __init__(self, mempool: Optional["Mempool"] = None) -> None:
+    def __init__(self, mempool: "Mempool") -> None:
         self._mempool = mempool
         self._cache: dict[bytes, object] = {}  # tx_hash → tx, held for reorg restoration
 
-    def confirm(self, block: Block) -> None:
-        """Block joined the canonical chain — remove its txs from the mempool."""
-        if self._mempool is None or not block.tx_hashes:
+    # the block joined the canonical chain,
+    # so we remove its txs from the mempool
+    def on_block_added(self, block: Block) -> None:
+        if not block.tx_hashes:
             return
         for tx in self._mempool.remove_confirmed(block.tx_hashes):
             self._cache[hash_transaction(tx)] = tx
 
+    # the block left the canonical chain,
+    # so we return its txs to the mempool
     def restore(self, block: Block) -> None:
-        """Block left the canonical chain — return its txs to the mempool."""
-        if self._mempool is None or not block.tx_hashes:
+        if not block.tx_hashes:
             return
         for tx_hash in block.tx_hashes:
             tx = self._cache.pop(tx_hash, None)

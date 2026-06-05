@@ -4,6 +4,7 @@ Tests for basic block addition and chain queries.
 import hashlib
 import pytest
 from blockchain.core.chain import Chain
+from blockchain.core.mempool import Mempool
 from blockchain.core.models import Block, BlockHeader
 from blockchain.core.block_utils import hash_block_header, hash_txs, satisfies_pow
 
@@ -25,7 +26,7 @@ def genesis_block():
 @pytest.fixture
 def chain(genesis_block):
     """Create a fresh chain with genesis block."""
-    return Chain(genesis_block)
+    return Chain(genesis_block, Mempool())
 
 
 def make_block(prev_hash: bytes, nonce: int = 0, difficulty: int = 2, tx_hashes: tuple = None) -> Block:

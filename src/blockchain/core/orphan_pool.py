@@ -1,9 +1,7 @@
 from .models import Block
 
-
+# holds blocks whose parent is not yet known
 class OrphanPool:
-    """Holds blocks whose parent is not yet known."""
-
     def __init__(self) -> None:
         self._by_parent: dict[bytes, list[Block]] = {}
         self._hashes: set[bytes] = set()

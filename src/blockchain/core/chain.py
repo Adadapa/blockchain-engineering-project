@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .mempool import Mempool
 
 class Chain:
-    def __init__(self, genesis: Block, mempool: Optional["Mempool"] = None) -> None:
+    def __init__(self, genesis: Block, mempool: "Mempool") -> None:
         self._blocks: list[Block] = [genesis]
         self._hash_to_height: dict[bytes, int] = {genesis.block_hash: 0}
         self._hash_to_block: Dict[bytes, Block] = {genesis.block_hash: genesis}
@@ -35,18 +35,8 @@ class Chain:
     def get_block_by_hash(self, block_hash: bytes) -> Optional[Block]:
         return self._hash_to_block.get(block_hash)
 
-    """
-        Accept a new block from the network.
-
-        Three cases:
-          1. Parent known, block makes longer chain → switch_to_fork
-          2. Parent known, block doesn't beat us    → record it, do nothing
-          3. Parent unknown                         → park as orphan
-
-        After any case, reconnect orphans that were waiting on this block.
-    """
     def add_block(self, block: Block) -> bool:
-        if block.block_hash in self._hash_to_block or self._orphans.contains(block.block_hash):
+        if self._already_known(block):
             return False
 
         validate_block(block)
@@ -54,16 +44,27 @@ class Chain:
         if block.header.prev_hash not in self._hash_to_height:
             self._orphans.add(block)
         else:
-            self._hash_to_block[block.block_hash] = block
-            new_height = self._hash_to_height[block.header.prev_hash] + 1
-            self._hash_to_height[block.block_hash] = new_height
-            if new_height > self.height:
-                self.switch_to_fork(self._build_fork_from(block))
+            self._connect_block(block)
 
-        for child in self._orphans.pop_children_of(block.block_hash):
-            self.add_block(child)
-
+        self._reconnect_orphans(block.block_hash)
         return True
+
+    def _already_known(self, block: Block) -> bool:
+        return block.block_hash in self._hash_to_block or self._orphans.contains(block.block_hash)
+
+    # index the block and switch to its fork if it beats the current tip
+    def _connect_block(self, block: Block) -> None:
+        self._hash_to_block[block.block_hash] = block
+        new_height = self._hash_to_height[block.header.prev_hash] + 1
+        self._hash_to_height[block.block_hash] = new_height
+
+        if new_height > self.height:
+            new_fork = self._build_fork_from(block)
+            self.switch_to_fork(new_fork)
+
+    def _reconnect_orphans(self, parent_hash: bytes) -> None:
+        for child in self._orphans.pop_children_of(parent_hash):
+            self.add_block(child)
 
     # fork logic ------------------------------------------------------------------------------------------------------
 
@@ -121,7 +122,7 @@ class Chain:
         self._hash_to_height[block.block_hash] = len(self._blocks) - 1
         self._hash_to_block[block.block_hash] = block
         
-        self._mempool_sync.confirm(block)
+        self._mempool_sync.on_block_added(block)
 
 # verify that each block's prev_hash connects to the next
 def _check_fork_links(fork: list[Block], base_prev_hash: bytes) -> None:
