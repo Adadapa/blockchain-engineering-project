@@ -11,36 +11,21 @@ from blockchain.registration.registration import (
     RegistrationCommunity,
     find_server
 )
+from blockchain.config import (
+    PRIVATE_KEY_FILE, KEY_TYPE, GROUP_ID, MEMBER_PUBLIC_KEYS,
+    BLOCKCHAIN_COMMUNITY_ID, REGISTRATION_COMMUNITY_ID, SERVER_PUBLIC_KEY, REGISTRATION_LISTEN_PORT,
+)
+
 # run this script to register your blockchain community
 # .venv/bin/python scripts/register_blockchain.py
 
-# --- configure these before running ---
-PRIVATE_KEY_FILE = "keys/lab1_identity.pem"
-KEY_TYPE = "curve25519"
-LISTEN_PORT = 8091
-
-GROUP_ID = "4d41fc487bee4c37"
-
-MEMBER_PUBLIC_KEYS = {
-    bytes.fromhex("4c69624e61434c504b3acfc56f266886acbb92502cb690df85dfb0845a6d5b3913a549294e501e4eed769df555fe6aac0266d2680800b5f27f2b964929850deb348b1bdd811b895e54f4"),
-    bytes.fromhex("4c69624e61434c504b3a7ab55be4ae73fb87e6b279d85ec3fce5d9946e69db498ccf03cefc02f8644c1417f185082c53f81c38fe581bc2010c7cbb15b36fc4fb75c874c6e60876b25605"),
-    bytes.fromhex("4c69624e61434c504b3a2373edf8904e50afcc3e6e70d8e02d38cf540ffe075260e721b4950ca580970a3637043eea6b336087ab05c270502cfde1125946f952203a48cb3ccf44946ac8"),
-}
-
-REGISTRATION_COMMUNITY_ID = bytes.fromhex("4c616233426c6f636b636861696e323032365057")
-SERVER_PUBLIC_KEY = bytes.fromhex(
-    "4c69624e61434c504b3ae3fc099fb56ca3b5e1de9a1c843387f2acdbb78b1bd4350ffde518068a0d246344b10d0d8"
-    "c355fd0d76873e7d7f7838f3715e025af08f791324495e083331ce6"
-)
-# --------------------------------------
-
 RegistrationCommunity.community_id = REGISTRATION_COMMUNITY_ID
-
+BlockchainCommunity.community_id = BLOCKCHAIN_COMMUNITY_ID
 
 def ipv8_config():
     builder = ConfigBuilder().clear_keys().clear_overlays()
     builder.set_address("0.0.0.0")
-    builder.set_port(LISTEN_PORT)
+    builder.set_port(REGISTRATION_LISTEN_PORT)
     builder.set_walker_interval(0.5)
     builder.add_key("member", KEY_TYPE, PRIVATE_KEY_FILE)
     builder.add_overlay(
@@ -84,20 +69,16 @@ async def main():
         )
 
         print("discovering Lab 3 server...")
-        # server = await find_server(
-        #     registration,
-        #     SERVER_PUBLIC_KEY,
-        # )
+        server = await find_server(registration, SERVER_PUBLIC_KEY)
 
-        # print(f"server found at {server.address}")
-        # registration.register_blockchain(
-        #     server,
-        #     GROUP_ID,
-        #     BlockchainCommunity.community_id,
-        # )
+        print(f"server found at {server.address}")
+        registration.register_blockchain(server, GROUP_ID, BlockchainCommunity.community_id)
 
+        print("waiting for registration response...")
         while registration.response is None:
             await asyncio.sleep(0.1)
+
+        print("registration complete")
 
     finally:
         await ipv8.stop()

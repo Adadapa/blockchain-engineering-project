@@ -11,31 +11,30 @@ import sys
 import time
 from pathlib import Path
 
-from blockchain.genesis import GENESIS_BLOCK
-
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from blockchain.genesis import GENESIS_BLOCK
 from blockchain.chain import Chain
 from blockchain.mempool import Mempool
 from blockchain.models import Block, BlockHeader
 from blockchain.miner import mine_and_broadcast
 from blockchain.community.community import BlockchainCommunity
-from ipv8.configuration import get_default_configuration
+from blockchain.config import (
+    PRIVATE_KEY_FILE, KEY_TYPE, NODE_LISTEN_PORT,
+    GROUP_ID, MEMBER_PUBLIC_KEYS, BLOCKCHAIN_COMMUNITY_ID, MINING_DIFFICULTY,
+)
+from ipv8.configuration import ConfigBuilder, Strategy, WalkerDefinition, default_bootstrap_defs
 from ipv8_service import IPv8
 
 
-async def mining_loop(community, interval: float = 1.0, difficulty: int = 8):
-    """
-    Continuously mine blocks and broadcast them.
-    Mines blocks with pending transactions from the mempool.
-    """
+async def mining_loop(community, interval: float = 1.0, difficulty: int = MINING_DIFFICULTY):
     print("[Miner] Mining...")
     try:
         while True:
             tip = community.chain.tip
-            # Create a header for the next block
             header = BlockHeader(
                 prev_hash=tip.block_hash,
-                txs_hash=b"\x00" * 32,  # placeholder; mine_and_broadcast will fill this
+                txs_hash=b"\x00" * 32,  # placeholder; mine_and_broadcast fills this
                 timestamp=int(time.time()),
                 difficulty=difficulty,
                 nonce=0,
@@ -56,58 +55,47 @@ async def mining_loop(community, interval: float = 1.0, difficulty: int = 8):
         raise
 
 
-async def ipv8_config_default():
-    config = get_default_configuration()
-    config["overlays"] = [
-        {
-            "class": "BlockchainCommunity",
-            "key": "anonymous id",
-            "walkers": [
-                {
-                    "strategy": "RandomWalk",
-                    "peers": 2,
-                    "init": {"timeout": 3.0},
-                }
-            ],
-            "bootstrappers": [],
-            "initialize": {},
-            "on_start": [],
-        }
-    ]
-    return config
+def ipv8_config():
+    builder = ConfigBuilder().clear_keys().clear_overlays()
+    builder.set_address("0.0.0.0")
+    builder.set_port(NODE_LISTEN_PORT)
+    builder.set_walker_interval(0.5)
+    builder.add_key("blockchain-node", KEY_TYPE, PRIVATE_KEY_FILE)
+    builder.add_overlay(
+        "BlockchainCommunity",
+        "blockchain-node",
+        [WalkerDefinition(Strategy.EdgeWalk, 20, {})],
+        default_bootstrap_defs,
+        {},
+        [],
+    )
+    return builder.finalize()
 
 
 async def main():
-    # Initialize chain and mempool
+    BlockchainCommunity.community_id = BLOCKCHAIN_COMMUNITY_ID
+
     mempool = Mempool()
     chain = Chain(GENESIS_BLOCK, mempool)
     print(f"[Node] Chain initialized (height={chain.height})")
-    print(f"[Node] Mempool initialized")
 
-    # Get IPv8 configuration (use your actual config if available)
-    config = await ipv8_config_default()
-
-    # Create and start IPv8 service
-    print("[Node] Starting IPv8 service...")
     ipv8 = IPv8(
-        config,
-        extra_communities={"BlockchainCommunity": BlockchainCommunity}
+        ipv8_config(),
+        extra_communities={"BlockchainCommunity": BlockchainCommunity},
     )
     await ipv8.start()
 
     try:
-        # Get the blockchain community overlay
         community = ipv8.get_overlay(BlockchainCommunity)
         if community is None:
             raise RuntimeError("Failed to load BlockchainCommunity overlay")
 
-
         community.chain = chain
         community.mempool = mempool
-        print(f"[Node] BlockchainCommunity loaded (community_id={community.community_id.hex()[:16]}...)")
+        print(f"[Node] BlockchainCommunity loaded (community_id={community.community_id.hex()})")
 
-        mining_task = asyncio.create_task(mining_loop(community, interval=2.0, difficulty=8))
-        await mining_task  # This will run until cancelled
+        mining_task = asyncio.create_task(mining_loop(community, interval=2.0))
+        await mining_task
 
     except KeyboardInterrupt:
         print("\nExiting")

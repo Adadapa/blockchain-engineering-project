@@ -1,10 +1,7 @@
-
-import hashlib
 import struct
 from ..models import Transaction
 from ..block_utils import hash_transaction
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.exceptions import InvalidSignature
+from ipv8.keyvault.crypto import default_eccrypto
 
 from .payloads import (
     SubmitTransactionResponse,
@@ -18,9 +15,10 @@ def validate_and_add_transaction(community, payload):
     signed_data = payload.sender_key + payload.data + struct.pack(">q", payload.timestamp)
 
     try:
-        pub_key = Ed25519PublicKey.from_public_bytes(payload.sender_key)
-        pub_key.verify(payload.signature, signed_data)
-    except (InvalidSignature, ValueError):
+        pub_key = default_eccrypto.key_from_public_bin(payload.sender_key)
+        if not default_eccrypto.is_valid_signature(pub_key, signed_data, payload.signature):
+            return None, b"\x00" * 32, False, "invalid signature"
+    except Exception:
         return None, b"\x00" * 32, False, "invalid signature"
 
     tx = Transaction(
@@ -44,7 +42,7 @@ def on_submit_transaction(community, peer, payload):
     ))
 
     if accepted:
-        community.broadcast_transaction(tx, exclude_peer=peer)
+        community.broadcast_new_transaction(tx, exclude_peer=peer)
 
 def on_get_chain_height(community, peer, payload):
     community.ez_send(peer, ChainHeightResponse(
