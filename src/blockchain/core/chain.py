@@ -100,19 +100,28 @@ class Chain:
             raise ValueError(f"fork height {new_height} does not beat current height {self.height}")
         return ancestor_height
 
-    # truncate the canonical chain to the ancestor and append the fork blocks
     def _apply_fork(self, fork: list[Block], ancestor_height: int) -> None:
-        orphaned = self._blocks[ancestor_height + 1:]
+        self._rollback_to(ancestor_height)
+        for block in fork:
+            self._append_to_chain(block)
+
+    # remove blocks above ancestor_height from the canonical chain
+    # and return their txs to the mempool
+    def _rollback_to(self, ancestor_height: int) -> None:
+        evicted = self._blocks[ancestor_height + 1:]
         self._blocks = self._blocks[:ancestor_height + 1]
         self._hash_to_height = {b.block_hash: h for h, b in enumerate(self._blocks)}
-
-        for block in orphaned:
+        for block in evicted:
             self._mempool_sync.restore(block)
-        for block in fork:
-            self._blocks.append(block)
-            self._hash_to_height[block.block_hash] = len(self._blocks) - 1
-            self._hash_to_block[block.block_hash] = block
-            self._mempool_sync.confirm(block)
+
+    # extend the canonical chain by one block
+    # and remove its txs from the mempool
+    def _append_to_chain(self, block: Block) -> None:
+        self._blocks.append(block)
+        self._hash_to_height[block.block_hash] = len(self._blocks) - 1
+        self._hash_to_block[block.block_hash] = block
+        
+        self._mempool_sync.confirm(block)
 
 # verify that each block's prev_hash connects to the next
 def _check_fork_links(fork: list[Block], base_prev_hash: bytes) -> None:
