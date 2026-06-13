@@ -106,9 +106,9 @@ def ipv8_configuration(config: LabClientConfig) -> dict[str, Any]:
         "lab-member",
         [
             WalkerDefinition(
-                Strategy.RandomWalk,
+                Strategy.EdgeWalk,
                 config.random_walk_target_peers,
-                {"timeout": config.random_walk_timeout},
+                {},
             )
         ],
         default_bootstrap_defs,
