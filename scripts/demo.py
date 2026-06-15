@@ -168,9 +168,9 @@ async def main():
         print(f"[Node] Port={NODE_LISTEN_PORT} community_id={blockchain.community_id.hex()}")
 
         # Discover teammates, then broadcast transactions, then mine.
-        # await discover_peers(blockchain)
+        await discover_peers(blockchain)
 
-        tx_task = asyncio.create_task(
+        asyncio.create_task(
             broadcast_scheduled_transactions(blockchain, TX_SCHEDULE)
         )
 
