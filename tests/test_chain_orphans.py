@@ -1,17 +1,14 @@
-"""
-Tests for orphan block handling and attachment.
-"""
+
 import hashlib
 import pytest
 from blockchain.core.chain import Chain
-from blockchain.core.mempool import Mempool
-from blockchain.core.models import Block, BlockHeader
+from blockchain.models.mempool import Mempool
+from blockchain.models import Block, BlockHeader
 from blockchain.core.block_utils import hash_block_header, hash_txs, satisfies_pow
 
 
 @pytest.fixture
 def genesis_block():
-    """Create a valid genesis block."""
     header = BlockHeader(
         prev_hash=b"\x00" * 32,
         txs_hash=hashlib.sha256(b"").digest(),
@@ -25,15 +22,10 @@ def genesis_block():
 
 @pytest.fixture
 def chain(genesis_block):
-    """Create a fresh chain with genesis block."""
     return Chain(genesis_block, Mempool())
 
 
 def make_block(prev_hash: bytes, nonce: int = 0, difficulty: int = 2, tx_hashes: tuple = None) -> Block:
-    """
-    Helper to create a valid block.
-    Mines a block with given parent hash and difficulty.
-    """
     if tx_hashes is None:
         tx_hashes = tuple()
     
@@ -56,10 +48,8 @@ def make_block(prev_hash: bytes, nonce: int = 0, difficulty: int = 2, tx_hashes:
 
 
 class TestOrphanHandling:
-    """Test buffering and attaching of orphaned blocks."""
 
     def test_orphan_buffered_when_parent_missing(self, chain, genesis_block):
-        """Block is buffered as orphan when its parent is unknown."""
         block1 = make_block(genesis_block.block_hash)
         block2 = make_block(block1.block_hash)  # depends on block1
         
@@ -69,7 +59,6 @@ class TestOrphanHandling:
         assert chain.height == 0  # chain not extended yet
 
     def test_orphan_attached_when_parent_arrives(self, chain, genesis_block):
-        """Orphan is automatically attached when parent is added."""
         block1 = make_block(genesis_block.block_hash)
         block2 = make_block(block1.block_hash)
         
@@ -83,7 +72,6 @@ class TestOrphanHandling:
         assert chain.tip.block_hash == block2.block_hash
 
     def test_multiple_orphans_attached_sequentially(self, chain, genesis_block):
-        """Multiple orphans are attached when their parent arrives."""
         block1 = make_block(genesis_block.block_hash)
         block2 = make_block(block1.block_hash)
         block3 = make_block(block2.block_hash)
@@ -99,7 +87,6 @@ class TestOrphanHandling:
 
 
     def test_deep_orphan_chain_attachment(self, chain, genesis_block):
-        """Long chains of orphans are attached correctly."""
         block1 = make_block(genesis_block.block_hash)
         block2 = make_block(block1.block_hash)
         block3 = make_block(block2.block_hash)

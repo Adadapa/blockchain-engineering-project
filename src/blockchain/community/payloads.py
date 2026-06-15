@@ -42,15 +42,10 @@ class BlockResponse:
     block_hash: bytes
     tx_hashes: bytes
 
-# peer-to-peer sync messages
 @payload_dataclass(msg_id=7)
 class AnnounceBlock:
     height: int
     block_hash: bytes
-
-@payload_dataclass(msg_id=8)
-class RequestBlock:
-    height: int
 
 @payload_dataclass(msg_id=9)
 class RequestBlockByHash:
@@ -64,7 +59,3 @@ class AnnounceTransaction:
     timestamp: int
     signature: bytes
 
-# peer discovery
-@payload_dataclass(msg_id=10)
-class Ready:
-    group_id: str

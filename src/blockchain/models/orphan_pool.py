@@ -1,6 +1,5 @@
-from .models import Block
+from blockchain.models import Block
 
-# holds blocks whose parent is not yet known
 class OrphanPool:
     def __init__(self) -> None:
         self._by_parent: dict[bytes, list[Block]] = {}

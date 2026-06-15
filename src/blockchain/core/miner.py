@@ -1,7 +1,12 @@
-from .models import Block, BlockHeader
-from .block_utils import hash_transaction, hash_txs, hash_block_header, satisfies_pow
+from __future__ import annotations
 
-## search for a nonce that makes the block hash satisfy the difficulty
+from blockchain.models import Block, BlockHeader
+from .block_utils import hash_transaction, hash_txs, hash_block_header, satisfies_pow
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from blockchain.network.blockchain_community import BlockchainCommunity
+
 def mine(header: BlockHeader) -> tuple[BlockHeader, bytes]:
     nonce = 0
     while True:
@@ -12,22 +17,31 @@ def mine(header: BlockHeader) -> tuple[BlockHeader, bytes]:
         nonce += 1
 
 
-def mine_and_broadcast(header: BlockHeader, community) -> Block:
-    pending = community.mempool.get_pending()
-    tx_hashes = tuple(hash_transaction(tx) for tx in pending)
-    txs_hash = hash_txs(list(tx_hashes))
+async def mining_loop(community: BlockchainCommunity):
+    loop = asyncio.get_running_loop()
+    print("Starting mining")
+    try:
+        while True:
+            tip = community.chain.tip
+            pending = community.mempool.get_pending()
+            tx_hashes = tuple(hash_transaction(tx) for tx in pending)
+            txs_hash = hash_txs(list(tx_hashes))
+            header = BlockHeader(
+                prev_hash=tip.block_hash,
+                txs_hash=txs_hash,
+                timestamp=int(time.time()),
+                difficulty=MINING_DIFFICULTY,
+                nonce=0,
+            )
 
-    header_with_txs = BlockHeader(
-        prev_hash=header.prev_hash,
-        txs_hash=txs_hash,
-        timestamp=header.timestamp,
-        difficulty=header.difficulty,
-        nonce=0,
-    )
+            mined_header, block_hash = await loop.run_in_executor(None, mine, header)
+            block = Block(header=mined_header, block_hash=block_hash, tx_hashes=tx_hashes)
 
-    mined_header, block_hash = mine(header_with_txs)
-    block = Block(header=mined_header, block_hash=block_hash, tx_hashes=tx_hashes)
-
-    community.chain.add_block(block)
-    community.broadcast_new_block(block)
-    return block
+            community.chain.add_block(block)
+            community.broadcast_new_block(block)
+            print(
+                f"Mined next Block {community.chain.height}: "
+                f"{block_hash.hex()[:16]}... ({len(tx_hashes)} txs)"
+            )
+    except asyncio.CancelledError:
+        raise

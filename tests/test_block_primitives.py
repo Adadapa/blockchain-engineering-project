@@ -1,5 +1,4 @@
 import hashlib
-import struct
 
 import pytest
 
@@ -10,7 +9,7 @@ from blockchain.core.block_utils import (
     hash_txs,
     satisfies_pow,
 )
-from blockchain.core.models import BlockHeader, HEADER_SIZE, Transaction
+from blockchain.models import BlockHeader, Transaction
 
 ZERO_HASH = b"\x00" * 32
 
