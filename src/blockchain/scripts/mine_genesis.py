@@ -1,13 +1,13 @@
 import hashlib
 import sys
 import time
-sys.path.insert(0, "src")
+# sys.path.insert(0, "src")
 
 from blockchain.models import BlockHeader
 from blockchain.core.block_utils import hash_block_header, satisfies_pow
 
 # run this script to mine a new genesis block
-# .venv/bin/python scripts/mine_genesis.py
+# .venv/bin/python src/blockchain/scripts/mine_genesis.py
 
 GENESIS_TIMESTAMP = 1748736000
 GENESIS_DIFFICULTY = 8

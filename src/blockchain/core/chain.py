@@ -79,7 +79,15 @@ class Chain:
         print(f"Height {self.height} {self._chain_view()}")
 
     def _chain_view(self) -> str:
-        parts = [f"{height}:{block.block_hash.hex()[:8]}" for height, block in enumerate(self.blocks)]
+        # Used for pretty-printing the chain state
+        parts = []
+        for height, block in enumerate(self._blocks):
+            txs = ",".join(tx_hash.hex()[:8] for tx_hash in block.tx_hashes)
+            parts.append(
+                f"{height}:{block.block_hash.hex()[:8]} txs=[{txs}]"
+                if block.tx_hashes
+                else f"{height}:{block.block_hash.hex()[:8]} txs=[]"
+            )
         return " -> ".join(parts)
 
 

@@ -1,13 +1,13 @@
 """
 Blockchain node: registers with the Lab 3 server, then mines and syncs blocks.
 
-Usage: .venv/bin/python scripts/node.py
+Usage: .venv/bin/python src/blockchain/scripts/node.py
 """
 import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from blockchain.models.genesis import GENESIS_BLOCK
 from blockchain.core.chain import Chain
