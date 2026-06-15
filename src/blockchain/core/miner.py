@@ -3,11 +3,17 @@ from .block_utils import hash_transaction, hash_txs, hash_block_header, satisfie
 
 ## search for a nonce that makes the block hash satisfy the difficulty
 def mine(header: BlockHeader) -> tuple[BlockHeader, bytes]:
+    print(
+        f"[Miner] Searching nonce for block: "
+        f"prev={header.prev_hash.hex()[:16]}... "
+        f"difficulty={header.difficulty}"
+    )
     nonce = 0
     while True:
         candidate = header.copy_with_new_nonce(nonce)
         digest = hash_block_header(candidate)
         if satisfies_pow(digest, candidate.difficulty):
+            print(f"[Miner] Found valid nonce: {nonce}")
             return candidate, digest
         nonce += 1
 

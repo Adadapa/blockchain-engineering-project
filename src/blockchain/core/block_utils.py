@@ -27,7 +27,13 @@ def count_leading_zero_bits(digest: bytes) -> int:
     return count
 
 def satisfies_pow(digest: bytes, difficulty: int) -> bool:
-    return count_leading_zero_bits(digest) >= difficulty
+    result = count_leading_zero_bits(digest) >= difficulty
+    # if result: # -> commented out on purpose, might be needed for demo later
+    #     print(
+    #         f"[Miner] PoW satisfied: hash={digest.hex()[:16]}... "
+    #         f"difficulty={difficulty}"
+    #     )
+    return result
 
 def validate_block(block: Block) -> None:
     # verify the hash is correct
