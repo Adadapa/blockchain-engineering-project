@@ -30,7 +30,11 @@ from ipv8_service import IPv8
 from ipv8.keyvault.crypto import default_eccrypto
 from blockchain.core.models import Transaction
 
-
+TX_SCHEDULE = [
+    (1.0, b"a1"),
+    (13.2, b"a2"),
+    (25.4, b"a3")
+]
 def ipv8_config():
     builder = ConfigBuilder().clear_keys().clear_overlays()
     builder.set_address("0.0.0.0")
@@ -100,6 +104,41 @@ async def mining_loop(community: BlockchainCommunity):
         print("[Miner] Stopped")
         raise
 
+async def broadcast_scheduled_transactions(community, schedule):
+    start = time.time()
+
+    for delay, data in schedule:
+        now = time.time()
+        sleep_for = start + delay - now
+        if sleep_for > 0:
+            await asyncio.sleep(sleep_for)
+
+        timestamp = int(time.time())
+        tx = broadcast_transaction(community, data=data, timestamp=timestamp)
+        tx_hash = hash_transaction(tx)
+
+        print(
+            f"[Tx] broadcaster={tx.sender_key.hex()[:16]}... "
+            f"tx_hash={tx_hash.hex()[:8]}... "
+            f"broadcasted {tx.data!r}"
+        )
+
+
+def broadcast_transaction(community, data: bytes, timestamp: int) -> Transaction:
+    sender_key = community.my_peer.public_key.key_to_bin()
+    signed_data = sender_key + data + struct.pack(">q", timestamp)
+    signature = default_eccrypto.create_signature(community.my_peer.key, signed_data)
+
+    tx = Transaction(
+        sender_key=sender_key,
+        data=data,
+        timestamp=timestamp,
+        signature=signature,
+    )
+
+    community.mempool.add(tx)
+    community.broadcast_new_transaction(tx)
+    return tx
 
 async def main():
     BlockchainCommunity.community_id = BLOCKCHAIN_COMMUNITY_ID
@@ -117,24 +156,6 @@ async def main():
     )
     await ipv8.start()
 
-    TX_DATA = b"my custom transaction payload"
-    TX_TIMESTAMP = int(time.time())
-
-    def broadcast_transaction(community, data: bytes, timestamp: int) -> Transaction:
-        sender_key = community.my_peer.public_key.key_to_bin()
-        signed_data = sender_key + data + struct.pack(">q", timestamp)
-        signature = default_eccrypto.create_signature(community.my_peer.key, signed_data)
-
-        tx = Transaction(
-            sender_key=sender_key,
-            data=data,
-            timestamp=timestamp,
-            signature=signature,
-        )
-
-        community.mempool.add(tx)
-        community.broadcast_new_transaction(tx)
-        return tx
 
     try:
         blockchain = ipv8.get_overlay(BlockchainCommunity)
@@ -149,16 +170,8 @@ async def main():
         # Discover teammates, then broadcast transactions, then mine.
         # await discover_peers(blockchain)
 
-        tx = broadcast_transaction(
-            blockchain,
-            data=TX_DATA,
-            timestamp=TX_TIMESTAMP,
-        )
-        tx_hash = hash_transaction(tx)
-        print(
-            f"[Tx] broadcaster={tx.sender_key.hex()[:16]}... "
-            f"tx_hash={tx_hash.hex()[:8]}... "
-            f"broadcasted {tx.data!r}"
+        tx_task = asyncio.create_task(
+            broadcast_scheduled_transactions(blockchain, TX_SCHEDULE)
         )
 
         await mining_loop(blockchain)
