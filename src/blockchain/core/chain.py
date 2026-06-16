@@ -46,7 +46,6 @@ class Chain:
             print(f"Orphan {block.block_hash.hex()[:16]}")
             self._orphans.add(block)
         else:
-            print(f"Add {block.block_hash.hex()[:16]}")
             self._connect_block(block)
 
         self._reconnect_orphans(block.block_hash)
@@ -62,8 +61,11 @@ class Chain:
         self._hash_to_height[block.block_hash] = new_height
 
         if new_height > self.height:
-            new_fork = self._forks.build_fork_from(block)
-            self._forks.switch_to_fork(new_fork)
+            if block.header.prev_hash == self.tip.block_hash:
+                self._append_to_chain(block)
+            else:
+                new_fork = self._forks.build_fork_from(block)
+                self._forks.switch_to_fork(new_fork)
 
     def _reconnect_orphans(self, parent_hash: bytes) -> None:
         for child in self._orphans.pop_children_of(parent_hash):
@@ -82,12 +84,10 @@ class Chain:
         # Used for pretty-printing the chain state
         parts = []
         for height, block in enumerate(self.blocks):
-            txs = ",".join(tx_hash.hex()[:8] for tx_hash in block.tx_hashes)
+            txs = ",".join(tx_hash.hex()[:12] for tx_hash in block.tx_hashes)
             parts.append(
-                f"{height}:{block.block_hash.hex()[:8]} txs=[{txs}]"
+                f"{height}:{block.block_hash.hex()[:12]} txs=[{txs}]"
                 if block.tx_hashes
-                else f"{height}:{block.block_hash.hex()[:8]} txs=[]"
+                else f"{height}:{block.block_hash.hex()[:12]} txs=[]"
             )
         return " -> ".join(parts)
-
-

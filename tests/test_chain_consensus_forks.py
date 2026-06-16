@@ -51,8 +51,8 @@ class TestForkAndConsensus:
 
     def test_fork_switch_when_longer_branch_arrives(self, chain, genesis_block):
         # Build main chain: genesis -> A -> B
-        blockA = make_block(genesis_block.block_hash)
-        blockB = make_block(blockA.block_hash)
+        blockA = make_block(genesis_block.block_hash, 0)
+        blockB = make_block(blockA.block_hash, 1)
         
         chain.add_block(blockA)
         chain.add_block(blockB)
@@ -87,24 +87,49 @@ class TestForkAndConsensus:
         chain.add_block(blockC)
         assert chain.height == 3
         main_tip = chain.tip.block_hash
+        print("\n" + "=" * 72)
+        print("TEST: CANONICAL CHAIN BEFORE COMPETING BRANCH")
+        print("=" * 72)
+        print("Genesis -> A -> B -> C")
+        print()
+        print(f"BEFORE: {chain._chain_view()}")
+        print()
         
-        # Competing branch at same height as blockB: genesis -> A' -> B'
-        blockA_prime = make_block(genesis_block.block_hash)
-        blockB_prime = make_block(blockA_prime.block_hash)
-        
-        chain.add_block(blockA_prime)
+        # Competing branch after A: genesis -> A -> B'
+        blockB_prime = make_block(blockA.block_hash, 5)
+
+        print(
+            f"TEST: RECEIVED BLOCK B' {blockB_prime.block_hash.hex()[:8]} "
+            f"(parent {blockB_prime.header.prev_hash.hex()[:8]})"
+        )
         chain.add_block(blockB_prime)
         assert chain.height == 3
         assert chain.tip.block_hash == main_tip  # no switch, still shorter
         
-        # Extend competing branch: genesis -> A' -> B' -> C' -> D'
-        blockC_prime = make_block(blockB_prime.block_hash)
-        blockD_prime = make_block(blockC_prime.block_hash)
-        
+        # Extend competing branch: genesis -> A -> B' -> C' -> D'
+        blockC_prime = make_block(blockB_prime.block_hash, 6)
+        blockD_prime = make_block(blockC_prime.block_hash, 7)
+
+        print(
+            f"TEST: RECEIVED BLOCK C' {blockC_prime.block_hash.hex()[:8]} "
+            f"(parent {blockC_prime.header.prev_hash.hex()[:8]})"
+        )
         chain.add_block(blockC_prime)
+
+        print(
+            f"TEST: RECEIVED BLOCK D' {blockD_prime.block_hash.hex()[:8]} "
+            f"(parent {blockD_prime.header.prev_hash.hex()[:8]})"
+        )
         chain.add_block(blockD_prime)
         
         # Competing branch is now longer (height 4 vs 3); reorg should happen
+        print()
+        print("=" * 72)
+        print("TEST: CANONICAL CHAIN AFTER COMPETING BRANCH PROCESSING")
+        print("=" * 72)
+        print()
+        print(f"AFTER:  {chain._chain_view()}")
+        print()
         assert chain.height == 4
         assert chain.tip.block_hash == blockD_prime.block_hash
 
@@ -136,20 +161,48 @@ class TestForkAndConsensus:
         blockB = make_block(blockA.block_hash)
         chain.add_block(blockA)
         chain.add_block(blockB)
-        
-        blockA_prime = make_block(genesis_block.block_hash)
-        blockB_prime = make_block(blockA_prime.block_hash)
+
+        print("\n" + "=" * 72)
+        print("TEST: MULTI-FORK RACE - INITIAL CANONICAL CHAIN")
+        print("=" * 72)
+        print()
+        print(f"CANONICAL: {chain._chain_view()}")
+        print()
+
+        blockA_prime = make_block(genesis_block.block_hash, 10)
+        blockB_prime = make_block(blockA_prime.block_hash, 11)
+        print(f"TEST: RECEIVED FORK1 BLOCK A' {blockA_prime.block_hash.hex()[:8]}")
         chain.add_block(blockA_prime)
+        print(f"STATE: {chain._chain_view()}")
+        print()
+        print(f"TEST: RECEIVED FORK1 BLOCK B' {blockB_prime.block_hash.hex()[:8]}")
         chain.add_block(blockB_prime)
-        
-        blockA_double_prime = make_block(genesis_block.block_hash)
-        blockB_double_prime = make_block(blockA_double_prime.block_hash)
-        blockC_double_prime = make_block(blockB_double_prime.block_hash)
-        
+        print(f"STATE: {chain._chain_view()}")
+        print()
+
+        blockA_double_prime = make_block(genesis_block.block_hash, 20)
+        blockB_double_prime = make_block(blockA_double_prime.block_hash, 21)
+        blockC_double_prime = make_block(blockB_double_prime.block_hash, 22)
+
+        print(f"TEST: RECEIVED FORK2 BLOCK A'' {blockA_double_prime.block_hash.hex()[:8]}")
         chain.add_block(blockA_double_prime)
+        print(f"STATE: {chain._chain_view()}")
+        print()
+        print(f"TEST: RECEIVED FORK2 BLOCK B'' {blockB_double_prime.block_hash.hex()[:8]}")
         chain.add_block(blockB_double_prime)
+        print(f"STATE: {chain._chain_view()}")
+        print()
+        print(f"TEST: RECEIVED FORK2 BLOCK C'' {blockC_double_prime.block_hash.hex()[:8]}")
         chain.add_block(blockC_double_prime)
-        
+
+        print()
+        print("=" * 72)
+        print("TEST: MULTI-FORK RACE - FINAL CANONICAL CHAIN")
+        print("=" * 72)
+        print()
+        print(f"WINNER:    {chain._chain_view()}")
+        print()
+
         # Fork2 is longest; should be main chain
         assert chain.height == 3
         assert chain.tip.block_hash == blockC_double_prime.block_hash
@@ -223,4 +276,3 @@ class TestBlockValidation:
         # Chain should still be at blockA
         assert chain.height == 1
         assert chain.tip.block_hash == blockA.block_hash
-

@@ -12,6 +12,7 @@ class ForkManager:
 
     # replace the canonical chain with a longer fork
     def switch_to_fork(self, fork: list[Block]) -> None:
+        print("Switching to fork")
         if not fork:
             raise ValueError("fork is empty")
         ancestor_height = self._ancestor_height_of(fork)

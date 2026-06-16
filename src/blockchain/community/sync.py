@@ -9,6 +9,7 @@ def broadcast_new_block(community, block):
         height=community.chain.height,
         block_hash=block.block_hash,
     )
+    print("[Miner] Broadcasting new block", announcement.block_hash)
     for peer in community.get_peers():
         community.ez_send(peer, announcement)
 
@@ -51,6 +52,7 @@ def on_block_response(community, peer, payload):
         print(f"Received {block.block_hash.hex()[:16]} from {peer}")
         community.chain.add_block(block)
         if not community.chain.contains(block.header.prev_hash):
+            print(f"[Sync] Unknown parent {block.header.prev_hash.hex()[:16]} for {block.block_hash.hex()[:16]}, requesting from {peer}")
             community.ez_send(peer, RequestBlockByHash(block_hash=block.header.prev_hash))
     except Exception as exc:
         print(f"Invalid block from {peer}: {exc}")
