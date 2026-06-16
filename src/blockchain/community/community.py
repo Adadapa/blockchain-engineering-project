@@ -3,9 +3,8 @@ from ipv8.lazy_community import lazy_wrapper
 import asyncio
 
 from .payloads import (
-    Ready,
     SubmitTransaction, GetChainHeight, GetBlock,
-    AnnounceBlock, RequestBlock, RequestBlockByHash, BlockResponse, AnnounceTransaction,
+    AnnounceBlock, RequestBlockByHash, BlockResponse, AnnounceTransaction,
 )
 from . import handlers, sync
 from blockchain.config import (BLOCKCHAIN_COMMUNITY_ID)
