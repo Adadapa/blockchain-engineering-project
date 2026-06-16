@@ -4,7 +4,6 @@ aiohttp-apispec==2.2.3
 aiosignal==1.4.0
 apispec==3.3.2
 attrs==26.1.0
--e git+ssh://git@github.com/Adadapa/blockchain-engineering-project.git@038778b88fcbe884c690d103da7566662895abf4#egg=blockchain_engineering_project
 cffi==2.0.0
 cryptography==43.0.3
 frozenlist==1.8.0
