@@ -19,6 +19,7 @@ from blockchain.core.block_utils import hash_transaction, hash_txs
 from blockchain.models import BlockHeader
 from blockchain.models.block import Block
 from blockchain.community.community import BlockchainCommunity
+from blockchain.community.payloads import SubmitTransaction
 from blockchain.registration.registration import RegistrationCommunity, find_server
 from blockchain.config import (
     PRIVATE_KEY_FILE, KEY_TYPE, NODE_LISTEN_PORT,
@@ -39,7 +40,7 @@ def ipv8_config():
     builder = ConfigBuilder().clear_keys().clear_overlays()
     builder.set_address("0.0.0.0")
     builder.set_port(NODE_LISTEN_PORT)
-    builder.set_walker_interval(0.5)
+    builder.set_walker_interval(0.1)
     builder.add_key("member", KEY_TYPE, PRIVATE_KEY_FILE)
     builder.add_overlay(
         "BlockchainCommunity",
@@ -138,14 +139,14 @@ async def main():
         blockchain.mempool = mempool
 
         # Start both long-running activities explicitly so their lifecycle is visible.
-        await discover_peers(blockchain)
+        # await discover_peers(blockchain)
         miner_task = asyncio.create_task(mining_loop(blockchain), name="mining-loop")
-        broadcaster_task = asyncio.create_task(
-            broadcast_scheduled_transactions(blockchain, TX_SCHEDULE),
-            name="tx-broadcaster",
-        )
-
-        await broadcaster_task
+        # broadcaster_task = asyncio.create_task(
+        #     broadcast_scheduled_transactions(blockchain, TX_SCHEDULE),
+        #     name="tx-broadcaster",
+        # )
+        #
+        # await broadcaster_task
         await miner_task
 
     except KeyboardInterrupt:
