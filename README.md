@@ -1,227 +1,204 @@
-# blockchain-engineering-project
-For the TUDelft course CS4160
+# Blockchain Engineering Project
 
-## Requirements
+---
+
+## Getting started
+
+**Requirements**
 
 - Python 3.10+
-- py-ipv8 library: https://github.com/Tribler/py-ipv8
-- py-ipv8 documentation: https://py-ipv8.readthedocs.io/
+- [py-ipv8](https://github.com/Tribler/py-ipv8)
+- [pytest](https://docs.pytest.org/)
 
-## Setup
+`requirements.txt` contains the full dependency tree.
 
-Install the project and Python dependency with:
+**Install**
 
-```bash
+```
 python3 -m pip install -e .
 ```
 
-## Group Registration
+or, to match the exact pinned versions:
 
-Copy `config/lab_client.example.json` to a local config file and fill in:
-
-- `private_key_file` for the member that sends the registration
-- `member_public_keys` in the canonical order for later signature bundles
-
-The client discovers the server through IPv8 peer discovery by matching `server_public_key`, so no fixed server host or
-port is needed in the config.
-
-### Key Management
-
-Each group member only needs their own private key. Do not share private keys between members.
-
-For registration, the config needs:
-
-- your own private key file in `private_key_file`
-- all three group members' public keys in `member_public_keys`
-
-The order of `member_public_keys` is important. It becomes the canonical signature order for later bundle submissions.
-All group members should use the same order in their configs.
-
-The server still requires the sender to be one of the listed public keys. That means the private key in
-`private_key_file` should match one of the three public keys in `member_public_keys`.
-
-Private keys should be placed under `keys/`. That directory is ignored by Git.
-
-Print the public key hex for an existing member key with:
-
-```bash
-lab-key keys/member1_private.pem
+```
+python3 -m pip install -r requirements.txt
 ```
 
-Put the printed public key into `member_public_keys`.
+**Keys**
 
-### Running Registration
+Each lab member has a private key from lab 1. 
+Keys live in `keys/`. The key type is `curve25519`, loaded by IPv8.
 
-Create or update your local config:
+**Run a node**
 
-```bash
-cp config/lab_client.example.json config/lab_client.local.json
+```
+python src/blockchain/scripts/node.py
 ```
 
-Fill in:
+The node will:
+- Start an IPv8 instance on port 8092
+- Discover the two teammate nodes using IPv8 peer discovery
+- Register with the lab server using `BLOCKCHAIN_COMMUNITY_ID`
+- Start mining once registration succeeds
 
-- `private_key_file`, for example `../keys/member1_private.pem`
-- the three `member_public_keys`
-- optionally `listen_port` if another local IPv8 client is already using the default port
+Config values (ports, difficulty, group id, public keys) live in [`src/blockchain/config.py`](src/blockchain/config.py).
 
-Run registration with:
+**Run the tests**
 
-```bash
-register-lab-group --config config/lab_client.local.json
+```
+python -m pytest tests/
 ```
 
-The command will:
+---
 
-- start an IPv8 node
-- join the lab group-signing community
-- discover peers through IPv8 random walk and bootstrappers
-- find the lab server by matching `server_public_key`
-- send the group registration payload with the three public keys
-- print the server response: `success`, `group_id`, and `message`
+## Project structure
 
-## Group Member Discovery
+`src/blockchain/config.py`: ports, keys, difficulty, and community ids.
 
-Your teammates appear as peers in the same Lab 2 IPv8 community. The client can discover all peers in the community and
-filter the known group members by the public keys in `member_public_keys`.
+**models**
 
-Run teammate discovery with:
+| file | description |
+|---|---|
+| `models/block_header.py` | `BlockHeader` dataclass + binary pack/unpack |
+| `models/block.py` | `Block` dataclass (header + hash + tx hashes) |
+| `models/transaction.py` | `Transaction` dataclass |
+| `models/genesis.py` | hardcoded genesis block |
+| `models/mempool.py` | pending transaction pool |
+| `models/mempool_sync.py` | keeps the mempool in sync with chain state |
+| `models/orphan_pool.py` | holds blocks whose parent isn't known yet |
 
-```bash
-discover-lab-members --config config/lab_client.local.json
-```
+**core**
 
-Your local private key must match one of the three configured public keys. If it does not, discovery fails immediately.
-Otherwise, the command expects to find the other two members.
+| file | description |
+|---|---|
+| `core/block_utils.py` | hashing, PoW check, block validation |
+| `core/chain.py` | canonical chain + fork switching logic |
+| `core/fork_manager.py` | fork detection and rollback |
+| `core/miner.py` | PoW search + async mining loop |
 
-You can also send a signed group-internal test message to discovered members:
+**community**
 
-```bash
-discover-lab-members --config config/lab_client.local.json --send "hello from member1"
-```
+| file | description |
+|---|---|
+| `community/payloads.py` | IPv8 message definitions |
+| `community/community.py` | `BlockchainCommunity`: message routing |
+| `community/handlers.py` | submit transaction, get block by height |
+| `community/sync.py` | block and transaction gossip |
 
-Group-internal messages are sent inside the same Lab 2 community with IPv8 authenticated messaging. The receiver checks
-the sender from the packet signature, ignores messages from public keys outside `member_public_keys`, and prints the
-sender MID and public key for accepted messages.
+**registration**
 
-## Session Preparation
+| file | description |
+|---|---|
+| `registration/payloads.py` | registration message definitions |
+| `registration/registration.py` | `RegistrationCommunity`: lab server handshake |
 
-Before timed challenge rounds, prepare the network topology without requesting any server challenge:
+**scripts**
 
-```bash
-prepare-lab-session --config config/lab_client.local.json
-```
+| file | description |
+|---|---|
+| `scripts/node.py` | entry point: starts IPv8, discovers peers, mines |
+| `scripts/demo.py` | demo script |
+| `scripts/mine_genesis.py` | one-off script used to produce the genesis block |
 
-This trigger:
+**tests**
 
-- starts IPv8 and joins the Lab 2 community
-- verifies your local private key matches one of `member_public_keys`
-- discovers the lab server by `server_public_key`
-- discovers the other two group members by `member_public_keys`
-- writes the discovered server/member addresses to `session_cache_file`
+| file | description |
+|---|---|
+| `tests/test_block_primitives.py` | hashing and PoW primitives |
+| `tests/test_chain.py` | chain init and fork switching |
+| `tests/test_chain_block_addition.py` | adding blocks to the chain |
+| `tests/test_chain_consensus_forks.py` | fork resolution and longest chain rule |
+| `tests/test_chain_orphans.py` | orphan block handling |
+| `tests/test_miner.py` | miner output |
 
-This command does not send a challenge request, so it does not start the 10-second round budget.
+---
 
-## Round Runner
+## Implementation details
 
-After registration and session preparation, start the round runner with:
+### Transactions and the mempool
 
-```bash
-run-lab-rounds --config config/lab_client.local.json --round 1
-```
+A `Transaction` is `sender_key + data + timestamp + signature`. The sender signs `sender_key + data + timestamp` with their curve25519 private key, and the node verifies it using the `sender_key` field included in the transaction.
 
-The runner starts at the selected round and continues through round 3:
+There are **two** ways a transaction enters a node:
 
-- infers your member number from `member_public_keys`
-- infers the submitter for the round from registration order
-- if you are the submitter, sends `ChallengeRequestPayload` (`message_id=3`) to the server
-- accepts either `ChallengeResponsePayload` (`message_id=4`) or early `RoundResultPayload` (`message_id=6`)
-- if you are the submitter, signs the raw 32-byte nonce, sends it to teammates, collects signature shares, and submits
-  `SignatureBundlePayload` (`message_id=5`) to the server
-- if a teammate signature share does not arrive before the configured timeout, the submitter re-sends
-  `NonceToSignPayload` only to the still-missing teammate(s)
-- if you are not the submitter, waits for `NonceToSignPayload`, signs the raw nonce, and returns `SignatureSharePayload`
-  to the submitter
-- after sending a signature, if this peer is the next round's submitter, it immediately polls the server until the
-  challenge response reports that next round
-- while that next submitter is polling the server, it still handles incoming `NonceToSignPayload` messages and returns
-  signature shares instead of blocking solely on server responses
-- peers that are not next-round submitters stay alive and wait for the next submitter's nonce
+- `SubmitTransaction`: sent by the lab server to submit a new transaction into the network. The node verifies the signature, adds it to the mempool, and sends back a `SubmitTransactionResponse` confirming whether it was accepted.
+- `AnnounceTransaction`: used between nodes to gossip a transaction that's already in the network. No response is sent, the node just adds it to the mempool and forwards it to its own peers.
 
-The config must include `group_id`, which is returned by successful registration.
+The **mempool** holds all unconfirmed transactions waiting to be included in a block. The miner pulls from it when building a new block.
 
-### Multi-Round Workflow
+---
 
-The submitter for each round is derived from registration order:
+### Genesis block
 
-- round 1 submitter: `member_public_keys[0]`
-- round 2 submitter: `member_public_keys[1]`
-- round 3 submitter: `member_public_keys[2]`
+All nodes start from the same hardcoded genesis block defined in `models/genesis.py`. It was mined once using `scripts/mine_genesis.py`, and the resulting nonce is hardcoded. 
+Its `prev_hash` is 32 zero bytes and it contains no transactions.
+Every node loads it on startup so they all share the same chain from height 0.
 
-All three members run the same command. The local private key decides which branch each process follows.
+---
 
-For each round:
+### Block flow
 
-1. The designated submitter asks the server for the current challenge.
-2. The server returns the nonce, round number, and shared deadline.
-3. The submitter signs the raw nonce locally and sends `NonceToSignPayload` to the other two members.
-4. Each signer signs the same raw nonce and sends `SignatureSharePayload` back.
-5. The submitter gathers all three signatures, restores registration order, and submits `SignatureBundlePayload`.
-6. The server returns `RoundResultPayload`.
+**Mining**
 
-The handoff to the next round is intentionally eager:
+- The miner takes the current chain tip (the most recent block) and pending transactions from the mempool
+- It builds a `BlockHeader` with `prev_hash = tip.block_hash` and `txs_hash = SHA-256(all tx hashes concatenated)`
+- It searches for a nonce such that `SHA-256(header)` has at least `difficulty` leading zero bits
+- Once found, the block is added to the local chain and `AnnounceBlock` (height + hash) is broadcast to all peers
 
-- after a signer returns its signature, it advances toward the next loop iteration
-- if that signer is the next round's submitter, it polls the server until the returned `round_number` advances
-- while polling the server, it still services incoming `NonceToSignPayload` work instead of blocking solely on the
-  server response
-- if a submitter times out waiting for one or more teammate signatures, it re-sends the nonce only to the missing peers
-- ordinary signers tolerate nonce requests from any valid round, sign them, and continue waiting for the round they
-  currently need
+**Propagation**
 
-## Code Layout
+When a block is mined, we don't broadcast the full block to all peers immediately. 
+Some peers might already have it (mined the same block, or received it from another peer), 
+so sending the full block to everyone unconditionally wastes bandwidth. Instead:
 
-- `src/lab_group_client/config.py`
-  Loads the JSON config, validates the three public keys, requires the private key file to exist, stores timing values
-  for challenge polling and nonce resends, and builds the IPv8 config with random-walk server discovery.
+- The miner broadcasts `AnnounceBlock` (just height + hash) to all peers
+- A peer skips the announcement if the announced height is strictly below its own chain height (it's already longer, so a shorter block can't help regardless of its hash), or if height and hash both match its current tip. 
+- Otherwise it replies with `RequestBlockByHash`.
+- The node responds with a full `BlockResponse` containing all header fields and tx hashes
+- If the receiving peer doesn't recognize the block's `prev_hash`, it immediately sends another `RequestBlockByHash` for the parent, 
+walking backwards until the gap is filled.
 
-- `src/lab_group_client/community.py`
-  Defines the IPv8 protocol messages and community logic. `RegisterPayload` is `message_id=1`.
-  `RegisterResponsePayload` is `message_id=2`. Challenge/server messages are `message_id=3` through `6`.
-  Group-internal nonce/signature messages are `NonceToSignPayload` (`message_id=101`) and
-  `SignatureSharePayload` (`message_id=102`). This file sends authenticated IPv8 messages, validates server responses
-  against the configured server public key, signs raw nonces, and buffers inbound nonce/signature work so fast messages
-  are not lost between awaits.
+**Adding a block**
 
-- `src/lab_group_client/register_group.py`
-  CLI workflow for registration. It starts IPv8, waits until the server is discovered by public key, calls the community
-  registration method, and prints the result.
+When `chain.add_block` is called:
+- Skip if already known (checked against both chain and orphan pool)
+- Validate: recompute the block hash, check PoW, recompute `txs_hash`
+- If the parent is unknown, put the block in the orphan pool and request the parent from the peer that sent it
+- If the parent is known, add the block to the chain
+- Check if any orphans were waiting on this block and recursively add them
 
-- `src/lab_group_client/discover_members.py`
-  Separate CLI workflow for teammate discovery. It starts IPv8, filters discovered peers by `member_public_keys`, and
-  can optionally send a group-internal test message to each matched teammate.
+When a block is added to the canonical chain, its transactions are removed from the mempool.
 
-- `src/lab_group_client/prepare_session.py`
-  Combined setup trigger for later timed rounds. It discovers the server and teammates, validates the local key belongs
-  to the group, and writes a session cache.
+**Orphan pool**
 
-- `src/lab_group_client/run_rounds.py`
-  Challenge runner from the selected start round through round 3. It requests challenges for the round submitter, sends
-  nonces to teammates, collects signature shares in registration order, re-sends missing nonce requests, submits
-  bundles, lets the next submitter poll the server until the next round is active, and keeps servicing nonce-sign work
-  while that polling is in progress.
+Blocks arrive out of order over the network. A block whose parent hasn't arrived yet can't be added to the chain, but dropping it would mean losing it permanently. Instead, orphans are stored keyed by `prev_hash`, and the node immediately requests the missing parent. When the parent arrives and is added to the chain, `_reconnect_orphans` checks if any orphans were waiting on it and adds them too.
 
-- `src/lab_group_client/keys.py`
-  Small helper CLI for printing the public key hex from an existing private key file.
+---
 
-- `config/lab_client.example.json`
-  Template config. Copy this to a local config and fill in real key values.
+### Fork handling and consensus
 
-- `requirements.txt` and `pyproject.toml`
-  Python dependency and install metadata. The installable package is `pyipv8`, while the upstream repository is
-  `Tribler/py-ipv8`.
+**Fork switching**
 
-## Signature Order
+Every valid block is stored in `_hash_to_block` regardless of whether it's on the canonical chain.
 
-- marina
-- ada
-- galya
+- If the parent is unknown, the block goes to the orphan pool and the parent is requested
+- The orphans reconnect recursively once the missing parents arrive, assembling the full fork in `_hash_to_block`
+- `ForkManager.build_fork_from` walks backwards from the fork tip through `_hash_to_block` until it hits a block in the canonical chain (the common ancestor). The collected blocks, reversed, are the fork to apply.
+- The new block's height is computed as `_hash_to_height[prev_hash] + 1`
+- If it beats the current chain height, the chain switches to the fork. If not, the canonical chain doesn't change.
+
+**Rollback**
+
+Once a fork is confirmed to be longer, the canonical chain is rolled back to the common ancestor before the fork blocks are applied.
+
+- `self.blocks` is truncated to the common ancestor
+- `_hash_to_height` is rebuilt from scratch from the remaining blocks
+- Each evicted block is passed to `MempoolSync.restore()`, which puts its transactions back in the mempool so they can be re-mined
+- `MempoolSync` can do this because it caches every transaction when it's confirmed out of the mempool. Without that cache, those transactions would be permanently lost on a reorg.
+- The fork blocks are then appended to the canonical chain one by one
+
+
+---
+## Notes
+
+The `all_assignments` branch contains the code for lab 2 as well.
