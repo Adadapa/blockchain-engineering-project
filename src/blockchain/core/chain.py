@@ -81,7 +81,7 @@ class Chain:
     def _chain_view(self) -> str:
         # Used for pretty-printing the chain state
         parts = []
-        for height, block in enumerate(self._blocks):
+        for height, block in enumerate(self.blocks):
             txs = ",".join(tx_hash.hex()[:8] for tx_hash in block.tx_hashes)
             parts.append(
                 f"{height}:{block.block_hash.hex()[:8]} txs=[{txs}]"
