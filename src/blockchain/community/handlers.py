@@ -1,5 +1,5 @@
 import struct
-from ..core.models import Transaction
+from blockchain.models import Transaction
 from ..core.block_utils import hash_transaction
 from ipv8.keyvault.crypto import default_eccrypto
 
@@ -33,7 +33,7 @@ def on_get_block(community, peer, payload):
     _send_block_response(community, peer, block, payload.height)
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# helpers
 
 def _verify_and_add(community, payload):
     """Verify the IPv8 signature and add the transaction to the mempool."""

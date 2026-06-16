@@ -1,11 +1,9 @@
 import hashlib
 import pytest
 
-from blockchain.core.block_utils import hash_block_header, hash_txs
 from blockchain.core.chain import Chain
-from blockchain.core.mempool import Mempool
-from blockchain.core.models import InvalidBlockError
-from blockchain.core.models import Block, BlockHeader
+from blockchain.models.mempool import Mempool
+from blockchain.models import Block, BlockHeader
 from blockchain.core.miner import mine
 
 ZERO_HASH = b"\x00" * 32
@@ -67,7 +65,7 @@ class TestSwitchToFork:
         # fork from genesis
         fork1 = mine_next(genesis)
         fork2 = mine_next(fork1)
-        chain.switch_to_fork([fork1, fork2])
+        chain._forks.switch_to_fork([fork1, fork2])
 
         assert chain.height == 2
         assert chain.tip == fork2
@@ -83,14 +81,14 @@ class TestSwitchToFork:
         fork1 = mine_next(genesis)
 
         with pytest.raises(ValueError):
-            chain.switch_to_fork([fork1])
+            chain._forks.switch_to_fork([fork1])
 
     def test_raises_on_empty_fork(self):
         genesis = make_genesis()
         chain = Chain(genesis, Mempool())
 
         with pytest.raises(ValueError):
-            chain.switch_to_fork([])
+            chain._forks.switch_to_fork([])
 
     def test_raises_if_fork_does_not_connect(self):
         genesis = make_genesis()
@@ -107,4 +105,4 @@ class TestSwitchToFork:
         orphan = Block(header=mined, block_hash=block_hash, tx_hashes=())
 
         with pytest.raises(ValueError):
-            chain.switch_to_fork([orphan])
+            chain._forks.switch_to_fork([orphan])

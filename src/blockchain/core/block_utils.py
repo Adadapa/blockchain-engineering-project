@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
-from .models import Block, BlockHeader, Transaction
-from .models.block import InvalidBlockError
+from blockchain.models import Block, BlockHeader, Transaction
+from blockchain.models import InvalidBlockError
 
 
 def hash_block_header(header: BlockHeader) -> bytes:
@@ -36,16 +36,13 @@ def satisfies_pow(digest: bytes, difficulty: int) -> bool:
     return result
 
 def validate_block(block: Block) -> None:
-    # verify the hash is correct
     expected_hash = hash_block_header(block.header)
     if block.block_hash != expected_hash:
         raise InvalidBlockError(f"block_hash mismatch: got {block.block_hash.hex()}, expected {expected_hash.hex()}")
 
-    # verify PoW
     if not satisfies_pow(block.block_hash, block.header.difficulty):
         raise InvalidBlockError(f"PoW not satisfied: hash {block.block_hash.hex()} does not have {block.header.difficulty} leading zero bits")
 
-    # verify txs_hash matches the tx_hashes list
     expected_txs_hash = hash_txs(list(block.tx_hashes))
     if block.header.txs_hash != expected_txs_hash:
         raise InvalidBlockError(f"txs_hash mismatch: got {block.header.txs_hash.hex()}, expected {expected_txs_hash.hex()}")

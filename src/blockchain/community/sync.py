@@ -1,6 +1,6 @@
 from .payloads import AnnounceBlock, BlockResponse, RequestBlockByHash, AnnounceTransaction
 from .handlers import _verify_and_add, _send_block_response
-from ..core.models import Block, BlockHeader
+from blockchain.models import Block, BlockHeader
 from ..core.block_utils import hash_block_header
 
 
@@ -9,7 +9,6 @@ def broadcast_new_block(community, block):
         height=community.chain.height,
         block_hash=block.block_hash,
     )
-    print(f"[Block] Broadcast {block.block_hash.hex()[:16]}... h={community.chain.height}")
     for peer in community.get_peers():
         community.ez_send(peer, announcement)
 
@@ -49,7 +48,7 @@ def on_block_response(community, peer, payload):
         block = _deserialize_block(payload)
         if block is None:
             return
-        print(f"[Block] Received {block.block_hash.hex()[:16]}... prev={block.header.prev_hash.hex()[:16]}...")
+        print(f"Received {block.block_hash.hex()[:16]} from {peer}")
         community.chain.add_block(block)
         if not community.chain.contains(block.header.prev_hash):
             community.ez_send(peer, RequestBlockByHash(block_hash=block.header.prev_hash))
@@ -62,16 +61,7 @@ def on_announce_transaction(community, peer, payload):
     if accepted:
         community.broadcast_new_transaction(tx, exclude_peer=peer)
 
-
-def on_request_block(community, peer, payload):
-    try:
-        block = community.chain.block_at(payload.height)
-    except IndexError:
-        return
-    _send_block_response(community, peer, block, payload.height)
-
-
-# ── helpers ───────────────────────────────────────────────────────────────────
+# helper
 
 def _deserialize_block(payload: BlockResponse) -> Block | None:
     if len(payload.tx_hashes) % 32 != 0:

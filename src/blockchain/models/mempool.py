@@ -1,5 +1,5 @@
 
-from .block_utils import hash_transaction
+from blockchain.core.block_utils import hash_transaction
 
 class Mempool:
     def __init__(self):
@@ -19,12 +19,10 @@ class Mempool:
         print(f"[Mempool] Added tx={tx_hash.hex()[:8]} state={self._state_view()}")
         return True
 
-    # max_count transactions to include in next block
     def get_pending(self, max_count: int = 100) -> list:
         return list(self._txs.values())[:max_count]
 
     def remove_confirmed(self, tx_hashes: tuple[bytes, ...]) -> list:
-        """Remove transactions from the mempool and return the removed objects."""
         removed = []
         for h in tx_hashes:
             tx = self._txs.pop(h, None)

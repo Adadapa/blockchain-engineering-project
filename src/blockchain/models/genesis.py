@@ -1,15 +1,11 @@
 import hashlib
-from .block_utils import hash_block_header
-from .models import BlockHeader, Block
+from blockchain.core.block_utils import hash_block_header
+from blockchain.models import BlockHeader, Block
 
-# todo: replace this with the same ones chosen in mine_genesis.py
 GENESIS_TIMESTAMP = 1748736000
 GENESIS_DIFFICULTY = 8
 
-# todo: update this with the resulting nonce from the script
 RESULTING_NONCE = 1
-
-# to remine: update scripts/mine_genesis.py and paste the result here
 
 GENESIS_BLOCK_HEADER = BlockHeader(
     prev_hash=b"\x00" * 32,

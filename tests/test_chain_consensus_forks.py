@@ -1,18 +1,15 @@
-"""
-Tests for fork handling, consensus (longest-chain rule), and block validation.
-"""
+
 import hashlib
 import pytest
 from blockchain.core.chain import Chain
-from blockchain.core.mempool import Mempool
-from blockchain.core.models import Block, BlockHeader
+from blockchain.models.mempool import Mempool
+from blockchain.models import Block, BlockHeader
 from blockchain.core.block_utils import hash_block_header, hash_txs, satisfies_pow
-from blockchain.core.models.block import InvalidBlockError
+from blockchain.models.block import InvalidBlockError
 
 
 @pytest.fixture
 def genesis_block():
-    """Create a valid genesis block."""
     header = BlockHeader(
         prev_hash=b"\x00" * 32,
         txs_hash=hashlib.sha256(b"").digest(),
@@ -26,21 +23,15 @@ def genesis_block():
 
 @pytest.fixture
 def chain(genesis_block):
-    """Create a fresh chain with genesis block."""
     return Chain(genesis_block, Mempool())
 
 
 def make_block(prev_hash: bytes, nonce: int = 0, difficulty: int = 2, tx_hashes: tuple = None) -> Block:
-    """
-    Helper to create a valid block.
-    Mines a block with given parent hash and difficulty.
-    """
     if tx_hashes is None:
         tx_hashes = tuple()
     
     txs_hash = hash_txs(list(tx_hashes))
-    
-    # Find a nonce that satisfies PoW
+
     nonce_candidate = nonce
     while True:
         header = BlockHeader(
@@ -59,7 +50,6 @@ def make_block(prev_hash: bytes, nonce: int = 0, difficulty: int = 2, tx_hashes:
 class TestForkAndConsensus:
 
     def test_fork_switch_when_longer_branch_arrives(self, chain, genesis_block):
-        """When a longer branch arrives, switch to it (longest-chain rule)."""
         # Build main chain: genesis -> A -> B
         blockA = make_block(genesis_block.block_hash)
         blockB = make_block(blockA.block_hash)
@@ -87,7 +77,6 @@ class TestForkAndConsensus:
         assert chain.tip.block_hash == blockC_prime.block_hash
 
     def test_fork_switch_deep_reorg(self, chain, genesis_block):
-        """Reorg can happen multiple levels deep."""
         # Main chain: genesis -> A -> B -> C
         blockA = make_block(genesis_block.block_hash)
         blockB = make_block(blockA.block_hash)
@@ -120,7 +109,6 @@ class TestForkAndConsensus:
         assert chain.tip.block_hash == blockD_prime.block_hash
 
     def test_side_branch_stored_for_future_extension(self, chain, genesis_block):
-        """Side branches are kept so they can be extended and potentially become main chain."""
         blockA = make_block(genesis_block.block_hash)
         blockA_prime = make_block(genesis_block.block_hash)
         
@@ -140,7 +128,6 @@ class TestForkAndConsensus:
         assert chain.tip.block_hash == blockB_prime.block_hash
 
     def test_longest_chain_wins_with_multiple_forks(self, chain, genesis_block):
-        """With multiple competing branches, the longest one becomes canonical."""
         # Main:  genesis -> A -> B
         # Fork1: genesis -> A' -> B'
         # Fork2: genesis -> A'' -> B'' -> C''
@@ -169,11 +156,8 @@ class TestForkAndConsensus:
 
 
 class TestBlockValidation:
-    """Test that invalid blocks are rejected."""
 
     def test_invalid_pow_rejected(self, chain, genesis_block):
-        """Block with invalid PoW is rejected."""
-        # Create a block with insufficient PoW (high difficulty but low nonce effort)
         header = BlockHeader(
             prev_hash=genesis_block.block_hash,
             txs_hash=hashlib.sha256(b"").digest(),
@@ -187,10 +171,9 @@ class TestBlockValidation:
             chain.add_block(bad_block)
 
     def test_mismatched_txs_hash_rejected(self, chain, genesis_block):
-        """Block with mismatched txs_hash is rejected."""
         # Create a block with wrong txs_hash
         tx_hashes = (b"\x01" * 32, b"\x02" * 32)
-        wrong_txs_hash = hashlib.sha256(b"garbage").digest()  # intentionally wrong
+        wrong_txs_hash = hashlib.sha256(b"garbage").digest()  # wrong
         
         header = BlockHeader(
             prev_hash=genesis_block.block_hash,
@@ -220,7 +203,6 @@ class TestBlockValidation:
             chain.add_block(bad_block)
 
     def test_invalid_block_rejected_despite_valid_parent(self, chain, genesis_block):
-        """Invalid block is rejected even if its parent is valid."""
         # Create a valid block first
         blockA = make_block(genesis_block.block_hash)
         chain.add_block(blockA)
