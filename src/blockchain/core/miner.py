@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import time
+
 from blockchain.models import Block, BlockHeader
 from .block_utils import hash_transaction, hash_txs, hash_block_header, satisfies_pow
 from typing import TYPE_CHECKING
 
+from ..config import MINING_DIFFICULTY
+
 if TYPE_CHECKING:
-    from blockchain.network.blockchain_community import BlockchainCommunity
+    from blockchain.community.community import BlockchainCommunity
 
 def mine(header: BlockHeader) -> tuple[BlockHeader, bytes]:
     print(
