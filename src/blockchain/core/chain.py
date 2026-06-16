@@ -62,8 +62,11 @@ class Chain:
         self._hash_to_height[block.block_hash] = new_height
 
         if new_height > self.height:
-            new_fork = self._forks.build_fork_from(block)
-            self._forks.switch_to_fork(new_fork)
+            if block.header.prev_hash == self.tip.block_hash:
+                self._append_to_chain(block)
+            else:
+                new_fork = self._forks.build_fork_from(block)
+                self._forks.switch_to_fork(new_fork)
 
     def _reconnect_orphans(self, parent_hash: bytes) -> None:
         for child in self._orphans.pop_children_of(parent_hash):
@@ -89,5 +92,4 @@ class Chain:
                 else f"{height}:{block.block_hash.hex()[:8]} txs=[]"
             )
         return " -> ".join(parts)
-
 
