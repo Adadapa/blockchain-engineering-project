@@ -67,6 +67,7 @@ async def discover_peers(community: BlockchainCommunity) -> list:
             p for p in community.get_peers()
             if p.public_key.key_to_bin() in MEMBER_PUBLIC_KEYS
         ]
+        print("Current teammates:", peers)
         for peer in peers:
             community.walk_to(peer.address)
         if len(peers) >= 2:
