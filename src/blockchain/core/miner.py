@@ -23,7 +23,6 @@ def mine(header: BlockHeader) -> tuple[BlockHeader, bytes]:
         candidate = header.copy_with_new_nonce(nonce)
         digest = hash_block_header(candidate)
         if satisfies_pow(digest, candidate.difficulty):
-            print(f"[Miner] Found valid nonce: {nonce}")
             return candidate, digest
         nonce += 1
 

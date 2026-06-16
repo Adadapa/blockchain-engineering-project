@@ -9,6 +9,7 @@ def broadcast_new_block(community, block):
         height=community.chain.height,
         block_hash=block.block_hash,
     )
+    print("broadcasting new block", announcement.block_hash)
     for peer in community.get_peers():
         community.ez_send(peer, announcement)
 
