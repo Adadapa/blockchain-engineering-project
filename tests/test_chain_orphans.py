@@ -61,13 +61,32 @@ class TestOrphanHandling:
     def test_orphan_attached_when_parent_arrives(self, chain, genesis_block):
         block1 = make_block(genesis_block.block_hash)
         block2 = make_block(block1.block_hash)
-        
+
+        print("\n" + "=" * 72)
+        print("TEST: ORPHAN RECONNECT WHEN PARENT ARRIVES")
+        print("=" * 72)
+        print()
+        print(f"START:  {chain._chain_view()}")
+        print()
+
         # Add block2 first (orphan)
+        print(f"TEST: RECEIVED CHILD FIRST {block2.block_hash.hex()[:8]}")
         chain.add_block(block2)
         assert chain.height == 0
-        
+
+        print()
+        print("STATE: child is buffered as orphan; canonical chain unchanged")
+        print(f"CHAIN:  {chain._chain_view()}")
+        print()
+
         # Add block1 (parent of orphan)
+        print(f"TEST: RECEIVED MISSING PARENT {block1.block_hash.hex()[:8]}")
         chain.add_block(block1)
+
+        print()
+        print("STATE: parent connects and buffered orphan attaches automatically")
+        print(f"FINAL:  {chain._chain_view()}")
+        print()
         assert chain.height == 2  # chain extended through both blocks
         assert chain.tip.block_hash == block2.block_hash
 
@@ -104,4 +123,3 @@ class TestOrphanHandling:
         chain.add_block(block1)
         assert chain.height == 5
         assert chain.tip.block_hash == block5.block_hash
-

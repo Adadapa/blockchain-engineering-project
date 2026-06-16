@@ -141,12 +141,12 @@ async def main():
         # Start both long-running activities explicitly so their lifecycle is visible.
         # await discover_peers(blockchain)
         miner_task = asyncio.create_task(mining_loop(blockchain), name="mining-loop")
-        # broadcaster_task = asyncio.create_task(
-        #     broadcast_scheduled_transactions(blockchain, TX_SCHEDULE),
-        #     name="tx-broadcaster",
-        # )
-        #
-        # await broadcaster_task
+        broadcaster_task = asyncio.create_task(
+            broadcast_scheduled_transactions(blockchain, TX_SCHEDULE),
+            name="tx-broadcaster",
+        )
+
+        await broadcaster_task
         await miner_task
 
     except KeyboardInterrupt:

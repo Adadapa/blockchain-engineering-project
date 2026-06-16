@@ -46,7 +46,6 @@ class Chain:
             print(f"Orphan {block.block_hash.hex()[:16]}")
             self._orphans.add(block)
         else:
-            print(f"Add {block.block_hash.hex()[:16]}")
             self._connect_block(block)
 
         self._reconnect_orphans(block.block_hash)
@@ -85,11 +84,10 @@ class Chain:
         # Used for pretty-printing the chain state
         parts = []
         for height, block in enumerate(self.blocks):
-            txs = ",".join(tx_hash.hex()[:8] for tx_hash in block.tx_hashes)
+            txs = ",".join(tx_hash.hex()[:12] for tx_hash in block.tx_hashes)
             parts.append(
-                f"{height}:{block.block_hash.hex()[:8]} txs=[{txs}]"
+                f"{height}:{block.block_hash.hex()[:12]} txs=[{txs}]"
                 if block.tx_hashes
-                else f"{height}:{block.block_hash.hex()[:8]} txs=[]"
+                else f"{height}:{block.block_hash.hex()[:12]} txs=[]"
             )
         return " -> ".join(parts)
-
