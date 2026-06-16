@@ -11,13 +11,13 @@ from pathlib import Path
 
 # sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from blockchain.core.genesis import GENESIS_BLOCK
+from blockchain.models.genesis import GENESIS_BLOCK
 from blockchain.core.chain import Chain
-from blockchain.core.mempool import Mempool
+from blockchain.models.mempool import Mempool
 from blockchain.core.miner import mining_loop
 from blockchain.core.block_utils import hash_transaction, hash_txs
-from blockchain.core.models import BlockHeader
-from blockchain.core.models.block import Block
+from blockchain.models import BlockHeader
+from blockchain.models.block import Block
 from blockchain.community.community import BlockchainCommunity
 from blockchain.registration.registration import RegistrationCommunity, find_server
 from blockchain.config import (
@@ -28,7 +28,7 @@ from blockchain.config import (
 from ipv8.configuration import ConfigBuilder, Strategy, WalkerDefinition, default_bootstrap_defs
 from ipv8_service import IPv8
 from ipv8.keyvault.crypto import default_eccrypto
-from blockchain.core.models import Transaction
+from blockchain.models import Transaction
 
 TX_SCHEDULE = [
     (1.0, b"a1"),
