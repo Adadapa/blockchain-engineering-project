@@ -137,14 +137,16 @@ async def main():
         blockchain.chain = chain
         blockchain.mempool = mempool
 
-        # Discover teammates, then broadcast transactions, then mine.
+        # Start both long-running activities explicitly so their lifecycle is visible.
         await discover_peers(blockchain)
-
-        asyncio.create_task(
-            broadcast_scheduled_transactions(blockchain, TX_SCHEDULE)
+        miner_task = asyncio.create_task(mining_loop(blockchain), name="mining-loop")
+        broadcaster_task = asyncio.create_task(
+            broadcast_scheduled_transactions(blockchain, TX_SCHEDULE),
+            name="tx-broadcaster",
         )
 
-        await mining_loop(blockchain)
+        await broadcaster_task
+        await miner_task
 
     except KeyboardInterrupt:
         print("\nInterrupted")
